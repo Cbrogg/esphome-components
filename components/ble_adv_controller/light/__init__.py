@@ -28,8 +28,7 @@ BleAdvSecLight = bleadvcontroller_ns.class_('BleAdvSecLight', light.LightOutput,
 
 CONFIG_SCHEMA = cv.All(
     cv.Any(
-        # Hauptlicht: RGB_LIGHT_SCHEMA -> rgb_light_schema(BleAdvLight)
-        light.rgb_light_schema(BleAdvLight).extend(
+        light.light_schema(BleAdvLight, light.LightType.RGB).extend(
             {
                 cv.GenerateID(CONF_OUTPUT_ID): cv.declare_id(BleAdvLight),
                 cv.Optional(CONF_COLD_WHITE_COLOR_TEMPERATURE, default="167 mireds"): cv.color_temperature,
@@ -41,14 +40,13 @@ CONFIG_SCHEMA = cv.All(
                 cv.Optional(CONF_RESTORE_MODE, default="RESTORE_DEFAULT_OFF"): cv.enum(light.RESTORE_MODES, upper=True, space="_"),
             }
         ).extend(ENTITY_BASE_CONFIG_SCHEMA),
-        # Sekundärlicht: RGB_LIGHT_SCHEMA -> rgb_light_schema(BleAdvSecLight)
-        light.rgb_light_schema(BleAdvSecLight).extend(
+        light.light_schema(BleAdvSecLight, light.LightType.RGB).extend(
             {
                 cv.GenerateID(CONF_OUTPUT_ID): cv.declare_id(BleAdvSecLight),
                 cv.Required(CONF_BLE_ADV_SECONDARY): cv.one_of(True),
             }
         ).extend(ENTITY_BASE_CONFIG_SCHEMA),
-    ),    
+    ),
     cv.has_none_or_all_keys(
         [CONF_COLD_WHITE_COLOR_TEMPERATURE, CONF_WARM_WHITE_COLOR_TEMPERATURE]
     ),
