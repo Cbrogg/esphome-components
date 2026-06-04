@@ -14,7 +14,7 @@ void BleAdvLight::set_min_brightness(int min_brightness, int min, int max, int s
   this->number_min_brightness_.traits.set_min_value(min);
   this->number_min_brightness_.traits.set_max_value(max);
   this->number_min_brightness_.traits.set_step(step);
-  this->number_min_brightness_.state = min_brightness; 
+  this->number_min_brightness_.publish_state(min_brightness);
 }
 
 void BleAdvLight::set_traits(float cold_white_temperature, float warm_white_temperature) {
@@ -77,9 +77,9 @@ void BleAdvLight::write_state(light::LightState *state) {
     eff_values.set_brightness(updated_brf);
     float cwf, wwf;
     if (this->get_parent()->is_reversed()) {
-      eff_values.as_cwww(&wwf, &cwf, 0, this->constant_brightness_);
+      eff_values.as_cwww(&wwf, &cwf, this->constant_brightness_);
     } else {
-      eff_values.as_cwww(&cwf, &wwf, 0, this->constant_brightness_);
+      eff_values.as_cwww(&cwf, &wwf, this->constant_brightness_);
     }
     ESP_LOGD(TAG, "Updating Cold: %.0f%%, Warm: %.0f%%", cwf*100, wwf*100);
     this->command(CommandType::LIGHT_WCOLOR, (uint8_t) (cwf*255), (uint8_t) (wwf*255));
@@ -119,4 +119,3 @@ void BleAdvSecLight::write_state(light::LightState *state) {
 
 } // namespace bleadvcontroller
 } // namespace esphome
-
