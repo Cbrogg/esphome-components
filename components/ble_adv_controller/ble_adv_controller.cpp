@@ -22,7 +22,7 @@ void BleAdvSelect::sub_init() {
   if (this->rtc_.load(&restored)) {
     for (auto &opt : this->traits.get_options()) {
       if(fnv1_hash(opt) == restored) {
-        this->state = opt;
+        this->publish_state(opt);
         return;
       }
     }
@@ -39,19 +39,26 @@ void BleAdvNumber::sub_init() {
   this->rtc_ = global_preferences->make_preference<float>(this->get_object_id_hash());
   float restored;
   if (this->rtc_.load(&restored)) {
-    this->state = restored;
+    this->publish_state(restored);
   }
 }
 
 void BleAdvController::set_encoding_and_variant(const std::string &encoding, const std::string &variant) {
-  // In 2026 nutzen wir eine modernere Zuweisung für Optionen
-  std::vector<std::string> options = this->handler_->get_ids(encoding);
+  auto ids = this->handler_->get_ids(encoding);
+  std::vector<const char *> options;
+  options.reserve(ids.size());
+  for (const auto &id : ids) {
+    options.push_back(id.c_str());
+  }
   this->select_encoding_.traits.set_options(options);
-  
+
   this->cur_encoder_ = this->handler_->get_encoder(encoding, variant);
   this->select_encoding_.publish_state(this->cur_encoder_->get_id());
-  this->select_encoding_.add_on_state_callback([this](const std::string &id, size_t index) {
-      this->refresh_encoder(id, index);
+  this->select_encoding_.add_on_state_callback([this](size_t index) {
+    auto options = this->select_encoding_.traits.get_options();
+    if (index < options.size()) {
+      this->refresh_encoder(options[index], index);
+    }
   });
 }
 
