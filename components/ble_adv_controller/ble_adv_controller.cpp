@@ -3,6 +3,7 @@
 #include "esphome/core/hal.h"
 #include "esphome/core/application.h"
 #include "esphome/core/preferences.h"
+#include "esphome/core/helpers.h"
 
 namespace esphome {
 namespace bleadvcontroller {
@@ -20,7 +21,8 @@ void BleAdvSelect::sub_init() {
   this->rtc_ = global_preferences->make_preference<uint32_t>(this->get_object_id_hash());
   uint32_t restored;
   if (this->rtc_.load(&restored)) {
-    for (auto &opt : this->traits.get_options()) {
+    const auto &options = this->traits.get_options();
+    for (auto &opt : options) {
       if(fnv1_hash(opt) == restored) {
         this->publish_state(opt);
         return;
@@ -45,17 +47,17 @@ void BleAdvNumber::sub_init() {
 
 void BleAdvController::set_encoding_and_variant(const std::string &encoding, const std::string &variant) {
   auto ids = this->handler_->get_ids(encoding);
-  std::vector<const char *> options;
-  options.reserve(ids.size());
+  FixedVector<const char *> options;
+  options.init(ids.size());
   for (const auto &id : ids) {
     options.push_back(id.c_str());
   }
-  this->select_encoding_.traits.set_options(options);
+  this->select_encoding_.traits.set_options(std::move(options));
 
   this->cur_encoder_ = this->handler_->get_encoder(encoding, variant);
   this->select_encoding_.publish_state(this->cur_encoder_->get_id());
   this->select_encoding_.add_on_state_callback([this](size_t index) {
-    auto options = this->select_encoding_.traits.get_options();
+    const auto &options = this->select_encoding_.traits.get_options();
     if (index < options.size()) {
       this->refresh_encoder(options[index], index);
     }
