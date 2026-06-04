@@ -22,11 +22,7 @@ class BleAdvDynConfig: public BaseEntity
 {
 public:
   void init(const char * name, const StringRef & parent_name) {
-    // StringRef handling for modern ESPHome
     this->ref_name_ = std::string(parent_name.c_str()) + " - " + std::string(name);
-    // set_object_id wurde entfernt, da es intern automatisch generiert wird oder veraltet ist
-    this->set_name(this->ref_name_.c_str());
-    this->set_entity_category(EntityCategory::ENTITY_CATEGORY_CONFIG);
     this->sub_init();
   }
 
