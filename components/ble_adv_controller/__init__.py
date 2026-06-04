@@ -27,7 +27,8 @@ bleadvcontroller_ns = cg.esphome_ns.namespace('bleadvcontroller')
 BleAdvController = bleadvcontroller_ns.class_('BleAdvController', cg.Component, cg.EntityBase)
 BleAdvEncoder = bleadvcontroller_ns.class_('BleAdvEncoder')
 BleAdvMultiEncoder = bleadvcontroller_ns.class_('BleAdvMultiEncoder', BleAdvEncoder)
-BleAdvHandler = bleadvcontroller_ns.class_('BleAdvHandler', cg.Component)
+# BleAdvHandler = bleadvcontroller_ns.class_('BleAdvHandler', cg.Component)
+BleAdvHandler = bleadvcontroller_ns.class_('BleAdvHandler')
 BleAdvEntity = bleadvcontroller_ns.class_('BleAdvEntity', cg.Component)
 
 FanLampEncoderV1 = bleadvcontroller_ns.class_('FanLampEncoderV1')
@@ -141,7 +142,7 @@ class BleAdvRegistry:
         if not cls.handler:
             hdl_id = ID("ble_adv_static_handler", type=BleAdvHandler)
             cls.handler = cg.new_Pvariable(hdl_id)
-            await cg.register_component(cls.handler, {})
+            # await cg.register_component(cls.handler, {})
             for encoding, params in BLE_ADV_ENCODERS.items():
                 for variant, param_variant in params["variants"].items():
                     enc_id = ID("enc_%s_%s" % (encoding, variant), type=param_variant["class"])
