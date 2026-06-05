@@ -228,7 +228,6 @@ async def _get_handler(config):
     ble_parent = await cg.get_variable(config[CONF_BLE_ID])
     cg.add(_handler.set_ble_parent(ble_parent))
     esp32_ble.register_gap_event_handler(ble_parent, _handler)
-    cg.add_define("USE_ESP32_BLE_ADVERTISING")
     cg.add_define("USE_ESP32_BLE_UUID")
     add_idf_sdkconfig_option("CONFIG_BT_ENABLED", True)
     add_idf_sdkconfig_option("CONFIG_BT_BLE_42_FEATURES_SUPPORTED", True)

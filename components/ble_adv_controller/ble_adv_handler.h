@@ -31,17 +31,9 @@ class BleAdvHandler : public Component {
   void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 
  protected:
-  enum class AdvertiserState : uint8_t {
-    IDLE,
-    ACQUIRING,
-    CONFIGURING,
-    STARTING,
-    ADVERTISING,
-    STOPPING,
-  };
-
-  static constexpr uint8_t MAX_CONFIG_FAILURES = 8;
-  static constexpr uint32_t ACQUIRE_SETTLE_MS = 30;
+  static constexpr uint8_t MAX_CONFIG_FAILURES = 20;
+  static constexpr uint32_t CONFIG_RETRY_MS = 50;
+  static constexpr uint32_t STOP_SETTLE_MS = 20;
 
   struct ScheduledPacket {
     ScheduledPacket(uint16_t message_id, protocol::AdvPacket packet)
@@ -54,23 +46,16 @@ class BleAdvHandler : public Component {
     uint8_t config_failures{0};
   };
 
-  void on_ble_parent_advertising_slot_(bool advertise);
-  void begin_acquire_();
-  bool configure_front_();
-  void request_stop_();
-  void finish_front_();
-  void restore_esphome_advertising_();
-  void handle_config_failure_();
+  bool start_front_packet_();
+  void rotate_after_stop_();
 
   protocol::Registry registry_;
   esp32_ble::ESP32BLE *ble_parent_{nullptr};
   std::list<ScheduledPacket> packets_;
   uint16_t next_message_id_{0};
-  uint32_t packet_started_at_{0};
-  uint32_t acquire_started_at_{0};
-  AdvertiserState state_{AdvertiserState::IDLE};
-  bool owns_advertiser_{false};
-  bool stop_already_idle_{false};
+  uint32_t adv_active_until_{0};
+  uint32_t stop_settle_until_{0};
+  uint32_t last_config_attempt_{0};
   std::string last_packet_hex_;
 
   esp_ble_adv_params_t advertising_params_{

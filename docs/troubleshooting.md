@@ -48,10 +48,11 @@ fan:
 
 Что делать:
 
-1. Обновите компонент до версии с исправленным `ble_adv_handler` (raw callback + retry без потери пакетов).
-2. Перепрошейте устройство.
-3. В логе должны появиться `ADV_DATA_RAW_SET_COMPLETE` / `ADV_START_COMPLETE` без ошибок.
-4. Queue Length должен возвращаться к 0 после команды.
+1. Обновите компонент до версии без `USE_ESP32_BLE_ADVERTISING` и без `advertising_register_raw_advertisement_callback` — handler использует GAP напрямую, как legacy-код.
+2. В YAML явно отключите рекламу ESPHome, если блок `esp32_ble` присутствует: `advertising: false`.
+3. Перепрошейте устройство.
+4. В логе должно появиться `Advertising packet for N ms` без `esp_ble_gap_config_adv_data_raw failed`.
+5. Queue Length должен возвращаться к 0 после команды.
 
 ## Предупреждения в логах
 
