@@ -13,7 +13,7 @@ class BleAdvLight : public light::LightOutput, public BleAdvEntity {
   void set_min_brightness(float value) { this->min_brightness_ = value; }
   void set_split_dim_cct(bool value) { this->split_dim_cct_ = value; }
 
-  void setup_state(light::LightState *state) override { this->state_ = state; }
+  void setup_state(light::LightState *state) override;
   void write_state(light::LightState *state) override;
   light::LightTraits get_traits() override { return this->traits_; }
 

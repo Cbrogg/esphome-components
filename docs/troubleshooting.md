@@ -7,6 +7,22 @@
 3. Увеличьте `duration` и `max_duration`.
 4. Проверьте логи ESPHome на `Unsupported command`.
 
+### В логах нет `ble_adv_controller.light`, но кнопка pair и fan работают
+
+Это значит, что `write_state()` не вызывается — команда из HA не доходит до output.
+
+1. Перепрошейте устройство с актуальным компонентом (output light не должен регистрироваться как отдельный component).
+2. При старте в логе должно быть: `Linked to light 'Спальня Люстра'` (для каждой лампы).
+3. При переключении в HA — строки `write_state`, `Switch ON/OFF`, `Queue packet`.
+4. В HA проверьте **entity_id** сцены/автоматизации: должна быть сущность ESPHome `light.<object_id>` (например `light.bedroom_light`), а не старая копия с другим именем.
+5. В Developer Tools → Services вызовите напрямую:
+   ```yaml
+   service: light.turn_on
+   target:
+     entity_id: light.bedroom_light
+   ```
+   Если в serial появились логи light — проблема в сцене/группе HA, не в прошивке.
+
 ## Cold/warm перепутаны
 
 Добавьте в контроллер:

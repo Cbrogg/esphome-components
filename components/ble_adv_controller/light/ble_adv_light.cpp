@@ -25,7 +25,14 @@ void BleAdvLight::dump_config() {
   ESP_LOGCONFIG(TAG, "  Minimum brightness: %.0f%%", this->min_brightness_ * 100.0F);
 }
 
+void BleAdvLight::setup_state(light::LightState *state) {
+  this->state_ = state;
+  ESP_LOGCONFIG(TAG, "Linked to light '%s'", state->get_name().c_str());
+}
+
 void BleAdvLight::write_state(light::LightState *state) {
+  ESP_LOGD(TAG, "write_state on=%s br=%.0f%%", state->current_values.is_on() ? "true" : "false",
+           state->current_values.get_brightness() * 100.0F);
   if (!state->current_values.is_on()) {
     if (!this->is_off_) {
       ESP_LOGD(TAG, "Switch OFF");
