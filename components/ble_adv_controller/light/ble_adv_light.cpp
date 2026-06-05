@@ -44,18 +44,14 @@ void BleAdvLight::set_traits(float cold_white_temperature, float warm_white_temp
   this->traits_.set_max_mireds(warm_white_temperature);
 }
 
-void BleAdvLight::dump_config() {
+void BleAdvLight::setup_state(light::LightState *state) {
+  this->state_ = state;
   ESP_LOGCONFIG(TAG, "BLE advertising light (output v3):");
-  ESP_LOGCONFIG(TAG, "  Controller: %p", static_cast<void *>(this->parent_));
+  ESP_LOGCONFIG(TAG, "  Linked to light '%s', parent=%p", state->get_name().c_str(),
+                static_cast<void *>(this->parent_));
   ESP_LOGCONFIG(TAG, "  Cold white: %.1f mireds", this->traits_.get_min_mireds());
   ESP_LOGCONFIG(TAG, "  Warm white: %.1f mireds", this->traits_.get_max_mireds());
   ESP_LOGCONFIG(TAG, "  Minimum brightness: %.0f%%", this->min_brightness_ * 100.0F);
-}
-
-void BleAdvLight::setup_state(light::LightState *state) {
-  this->state_ = state;
-  ESP_LOGCONFIG(TAG, "Linked to light '%s', parent=%p", state->get_name().c_str(),
-                static_cast<void *>(this->parent_));
 }
 
 void BleAdvLight::update_state(light::LightState *state) {
@@ -149,7 +145,11 @@ void BleAdvLight::write_state(light::LightState *state) {
   }
 }
 
-void BleAdvSecLight::dump_config() { ESP_LOGCONFIG(TAG, "BLE advertising secondary light"); }
+void BleAdvSecLight::setup_state(light::LightState *state) {
+  this->state_ = state;
+  ESP_LOGCONFIG(TAG, "BLE advertising secondary light '%s', parent=%p", state->get_name().c_str(),
+                static_cast<void *>(this->parent_));
+}
 
 void BleAdvSecLight::write_state(light::LightState *state) {
   bool enabled;

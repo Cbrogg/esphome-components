@@ -8,7 +8,6 @@ namespace esphome::ble_adv_controller {
 
 class BleAdvLight : public light::LightOutput, public Parented<BleAdvController> {
  public:
-  void dump_config() override;
   void set_traits(float cold_white_temperature, float warm_white_temperature);
   void set_constant_brightness(bool value) { this->constant_brightness_ = value; }
   void set_min_brightness(float value) { this->min_brightness_ = value; }
@@ -34,9 +33,8 @@ class BleAdvLight : public light::LightOutput, public Parented<BleAdvController>
 
 class BleAdvSecLight : public light::LightOutput, public Parented<BleAdvController> {
  public:
-  void dump_config() override;
   void set_traits() { this->traits_.set_supported_color_modes({light::ColorMode::ON_OFF}); }
-  void setup_state(light::LightState *state) override { this->state_ = state; }
+  void setup_state(light::LightState *state) override;
   void write_state(light::LightState *state) override;
   light::LightTraits get_traits() override { return this->traits_; }
 
