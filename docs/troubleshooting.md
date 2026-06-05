@@ -51,7 +51,7 @@ fan:
 1. Обновите компонент до версии без `USE_ESP32_BLE_ADVERTISING` и без `advertising_register_raw_advertisement_callback` — handler использует GAP напрямую, как legacy-код.
 2. В YAML явно отключите рекламу ESPHome, если блок `esp32_ble` присутствует: `advertising: false`.
 3. Перепрошейте устройство.
-4. В логе должно появиться `Advertising packet for N ms` без `esp_ble_gap_config_adv_data_raw failed`.
+4. В логе должно появиться `Advertising started` (event-driven GAP) без `esp_ble_gap_config_adv_data_raw failed`.
 5. Queue Length должен возвращаться к 0 после команды.
 
 ## Предупреждения в логах

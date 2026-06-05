@@ -19,6 +19,9 @@ esp32:
 
 logger:
 
+esp32_ble:
+  advertising: false
+
 api:
   encryption:
     key: !secret api_encryption_key

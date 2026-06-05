@@ -2,8 +2,9 @@ import esphome.automation as automation
 import esphome.codegen as cg
 from esphome.components import esp32_ble, number, select, sensor, text_sensor
 from esphome.components.esp32 import add_idf_sdkconfig_option
-from esphome.components.esp32_ble import CONF_BLE_ID
+from esphome.components.esp32_ble import CONF_ADVERTISING, CONF_BLE_ID
 import esphome.config_validation as cv
+import esphome.final_validate as fv
 from esphome.const import (
     CONF_COMMAND,
     CONF_DURATION,
@@ -215,6 +216,20 @@ CONFIG_SCHEMA = cv.All(
     _validate_controller,
     cv.only_on([PLATFORM_ESP32]),
 )
+
+
+def _final_validate_ble_adv(config):
+    fconf = fv.full_config.get()
+    ble_config = fconf.get("esp32_ble")
+    if ble_config is not None and ble_config.get(CONF_ADVERTISING, False):
+        raise cv.Invalid(
+            "esp32_ble.advertising must be false when using ble_adv_controller; "
+            "the component exclusively owns BLE GAP advertising"
+        )
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = _final_validate_ble_adv
 
 _handler = None
 

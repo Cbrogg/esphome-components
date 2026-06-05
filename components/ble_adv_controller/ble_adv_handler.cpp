@@ -19,6 +19,10 @@ void BleAdvHandler::dump_config() {
   ESP_LOGCONFIG(TAG, "  Protocol encoders: %u", static_cast<unsigned>(this->registry_.encoders().size()));
 }
 
+bool BleAdvHandler::ble_ready_() const {
+  return this->ble_parent_ != nullptr && this->ble_parent_->is_active();
+}
+
 uint16_t BleAdvHandler::add_packets(std::vector<protocol::AdvPacket> packets) {
   if (packets.empty())
     return 0;
@@ -42,55 +46,84 @@ void BleAdvHandler::remove_packets(uint16_t message_id) {
   }
 }
 
-bool BleAdvHandler::start_front_packet_() {
-  if (this->packets_.empty())
-    return false;
+void BleAdvHandler::begin_transmission_() {
+  if (this->packets_.empty() || !this->ble_ready_())
+    return;
 
-  const uint32_t now = millis();
-  if (now - this->last_config_attempt_ < CONFIG_RETRY_MS)
-    return false;
+  this->stop_requested_at_ = millis();
+  const esp_err_t error = esp_ble_gap_stop_advertising();
+  this->stop_was_running_ = (error == ESP_OK);
+  this->state_ = AdvertiserState::STOPPING;
+  if (!this->stop_was_running_) {
+    ESP_LOGV(TAG, "GAP stop returned %s, waiting for idle", esp_err_to_name(error));
+  }
+}
 
-  this->last_config_attempt_ = now;
+void BleAdvHandler::begin_config_() {
+  if (this->state_ != AdvertiserState::STOPPING) {
+    return;
+  }
+  if (this->packets_.empty()) {
+    this->state_ = AdvertiserState::IDLE;
+    return;
+  }
+
   auto &front = this->packets_.front();
   auto &packet = front.packet;
   this->last_packet_hex_ = packet.to_hex();
 
-  esp_ble_gap_stop_advertising();
-
-  const esp_err_t config_error = esp_ble_gap_config_adv_data_raw(
+  const esp_err_t error = esp_ble_gap_config_adv_data_raw(
       const_cast<uint8_t *>(packet.bytes.data()), static_cast<uint32_t>(packet.len));
-  if (config_error != ESP_OK) {
-    ESP_LOGE(TAG, "esp_ble_gap_config_adv_data_raw failed: %s", esp_err_to_name(config_error));
-    if (++front.config_failures >= MAX_CONFIG_FAILURES) {
-      ESP_LOGE(TAG, "Dropping packet after %u config failures: %s", front.config_failures,
-               packet.to_hex().c_str());
-      this->packets_.pop_front();
-    }
-    return false;
+  if (error != ESP_OK) {
+    ESP_LOGE(TAG, "esp_ble_gap_config_adv_data_raw failed: %s", esp_err_to_name(error));
+    this->handle_failure_();
+    return;
   }
 
-  const esp_err_t start_error = esp_ble_gap_start_advertising(&this->advertising_params_);
-  if (start_error != ESP_OK) {
-    ESP_LOGE(TAG, "esp_ble_gap_start_advertising failed: %s", esp_err_to_name(start_error));
-    if (++front.config_failures >= MAX_CONFIG_FAILURES) {
-      ESP_LOGE(TAG, "Dropping packet after %u start failures: %s", front.config_failures,
-               packet.to_hex().c_str());
-      this->packets_.pop_front();
-    }
-    return false;
-  }
-
-  front.processed = true;
-  front.config_failures = 0;
-  this->adv_active_until_ = now + packet.min_duration_ms;
-  ESP_LOGD(TAG, "Advertising packet for %u ms", packet.min_duration_ms);
-  return true;
+  this->state_ = AdvertiserState::CONFIGURING;
 }
 
-void BleAdvHandler::rotate_after_stop_() {
+void BleAdvHandler::begin_start_() {
+  if (this->state_ != AdvertiserState::CONFIGURING) {
+    return;
+  }
+  const esp_err_t error = esp_ble_gap_start_advertising(&this->advertising_params_);
+  if (error != ESP_OK) {
+    ESP_LOGE(TAG, "esp_ble_gap_start_advertising failed: %s", esp_err_to_name(error));
+    this->handle_failure_();
+    return;
+  }
+  this->state_ = AdvertiserState::STARTING;
+}
+
+void BleAdvHandler::handle_failure_() {
+  this->state_ = AdvertiserState::IDLE;
+  this->retry_after_ = millis() + RETRY_BACKOFF_MS;
+
+  if (this->packets_.empty())
+    return;
+
+  auto &front = this->packets_.front();
+  if (++front.config_failures >= MAX_CONFIG_FAILURES) {
+    ESP_LOGE(TAG, "Dropping packet after %u failures: %s", front.config_failures, front.packet.to_hex().c_str());
+    this->packets_.pop_front();
+    front.config_failures = 0;
+  }
+}
+
+void BleAdvHandler::request_rotate_stop_() {
+  const esp_err_t error = esp_ble_gap_stop_advertising();
+  this->stop_requested_at_ = millis();
+  this->stop_was_running_ = (error == ESP_OK);
+  this->state_ = AdvertiserState::STOPPING_ROTATE;
+  if (!this->stop_was_running_) {
+    this->finish_rotate_();
+  }
+}
+
+void BleAdvHandler::finish_rotate_() {
   if (this->packets_.empty()) {
-    this->adv_active_until_ = 0;
-    this->stop_settle_until_ = 0;
+    this->state_ = AdvertiserState::IDLE;
     return;
   }
 
@@ -102,68 +135,113 @@ void BleAdvHandler::rotate_after_stop_() {
     this->packets_.pop_front();
   }
 
-  this->adv_active_until_ = 0;
-  this->stop_settle_until_ = millis() + STOP_SETTLE_MS;
+  this->state_ = AdvertiserState::IDLE;
 }
 
 void BleAdvHandler::loop() {
-  if (this->is_failed())
+  if (this->is_failed() || !this->ble_ready_())
     return;
-
-  this->packets_.remove_if([](const ScheduledPacket &packet) { return packet.processed && packet.remove; });
-
-  if (this->packets_.empty()) {
-    this->adv_active_until_ = 0;
-    this->stop_settle_until_ = 0;
-    return;
-  }
 
   const uint32_t now = millis();
 
-  if (this->stop_settle_until_ != 0) {
-    if (now < this->stop_settle_until_)
+  if (this->state_ == AdvertiserState::IDLE) {
+    this->packets_.remove_if([](const ScheduledPacket &packet) { return packet.processed && packet.remove; });
+    if (this->packets_.empty())
       return;
-    this->stop_settle_until_ = 0;
-    this->start_front_packet_();
+    if (now < this->retry_after_)
+      return;
+    this->begin_transmission_();
     return;
   }
 
-  if (this->adv_active_until_ != 0) {
-    if (now < this->adv_active_until_)
-      return;
-
-    const auto &front = this->packets_.front();
-    const bool should_rotate = this->packets_.size() > 1 || front.remove;
-    if (!should_rotate) {
-      this->adv_active_until_ = now + front.packet.min_duration_ms;
+  if (this->state_ == AdvertiserState::STOPPING) {
+    if (!this->stop_was_running_ && now - this->stop_requested_at_ >= STOP_IDLE_SETTLE_MS) {
+      this->begin_config_();
       return;
     }
-
-    esp_ble_gap_stop_advertising();
-    this->rotate_after_stop_();
+    if (this->stop_was_running_ && now - this->stop_requested_at_ >= STOP_EVENT_TIMEOUT_MS) {
+      ESP_LOGW(TAG, "ADV_STOP_COMPLETE timeout, forcing config");
+      this->begin_config_();
+    }
     return;
   }
 
-  this->start_front_packet_();
+  if (this->state_ == AdvertiserState::STOPPING_ROTATE) {
+    if (!this->stop_was_running_ && now - this->stop_requested_at_ >= STOP_IDLE_SETTLE_MS) {
+      this->finish_rotate_();
+    } else if (this->stop_was_running_ && now - this->stop_requested_at_ >= STOP_EVENT_TIMEOUT_MS) {
+      ESP_LOGW(TAG, "ADV_STOP_COMPLETE timeout during rotate");
+      this->finish_rotate_();
+    }
+    return;
+  }
+
+  if (this->state_ != AdvertiserState::ADVERTISING || this->packets_.empty())
+    return;
+
+  const auto &front = this->packets_.front();
+  const bool should_rotate = this->packets_.size() > 1 || front.remove;
+  if (!should_rotate) {
+    if (now - this->packet_started_at_ >= front.packet.min_duration_ms)
+      this->packet_started_at_ = now;
+    return;
+  }
+
+  if (now - this->packet_started_at_ >= front.packet.min_duration_ms)
+    this->request_rotate_stop_();
 }
 
 void BleAdvHandler::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
   switch (event) {
-    case ESP_GAP_BLE_ADV_DATA_RAW_SET_COMPLETE_EVT:
-      if (param->adv_data_raw_cmpl.status != ESP_BT_STATUS_SUCCESS) {
-        ESP_LOGW(TAG, "Raw advertising configuration async status: %d", param->adv_data_raw_cmpl.status);
-      }
-      break;
-    case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
-      if (param->adv_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
-        ESP_LOGW(TAG, "Advertising async start status: %d", param->adv_start_cmpl.status);
-      }
-      break;
     case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
-      if (param->adv_stop_cmpl.status != ESP_BT_STATUS_SUCCESS) {
-        ESP_LOGW(TAG, "Advertising async stop status: %d", param->adv_stop_cmpl.status);
+      if (this->state_ == AdvertiserState::STOPPING) {
+        if (param->adv_stop_cmpl.status != ESP_BT_STATUS_SUCCESS) {
+          ESP_LOGW(TAG, "Advertising stop status: %d", param->adv_stop_cmpl.status);
+        }
+        this->begin_config_();
+      } else if (this->state_ == AdvertiserState::STOPPING_ROTATE) {
+        if (param->adv_stop_cmpl.status != ESP_BT_STATUS_SUCCESS) {
+          ESP_LOGW(TAG, "Advertising stop status: %d", param->adv_stop_cmpl.status);
+        }
+        this->finish_rotate_();
       }
       break;
+
+    case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
+    case ESP_GAP_BLE_SCAN_RSP_DATA_SET_COMPLETE_EVT:
+      if (this->state_ == AdvertiserState::STOPPING && !this->stop_was_running_) {
+        this->begin_config_();
+      }
+      break;
+
+    case ESP_GAP_BLE_ADV_DATA_RAW_SET_COMPLETE_EVT:
+      if (this->state_ != AdvertiserState::CONFIGURING)
+        return;
+      if (param->adv_data_raw_cmpl.status != ESP_BT_STATUS_SUCCESS) {
+        ESP_LOGE(TAG, "Raw advertising configuration failed: %d", param->adv_data_raw_cmpl.status);
+        this->handle_failure_();
+        return;
+      }
+      this->begin_start_();
+      break;
+
+    case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
+      if (this->state_ != AdvertiserState::STARTING)
+        return;
+      if (param->adv_start_cmpl.status != ESP_BT_STATUS_SUCCESS) {
+        ESP_LOGE(TAG, "Advertising start failed: %d", param->adv_start_cmpl.status);
+        this->handle_failure_();
+        return;
+      }
+      if (!this->packets_.empty()) {
+        this->packets_.front().processed = true;
+        this->packets_.front().config_failures = 0;
+      }
+      this->packet_started_at_ = millis();
+      this->state_ = AdvertiserState::ADVERTISING;
+      ESP_LOGD(TAG, "Advertising started");
+      break;
+
     default:
       break;
   }
