@@ -20,6 +20,7 @@ class BleAdvLight : public light::LightOutput, public Parented<BleAdvController>
 
  protected:
   bool send_command(CommandType type, uint8_t arg0 = 0, uint8_t arg1 = 0);
+  void apply_state(light::LightState *state);
 
   light::LightState *state_{nullptr};
   light::LightTraits traits_;
@@ -35,6 +36,7 @@ class BleAdvSecLight : public light::LightOutput, public Parented<BleAdvControll
  public:
   void set_traits() { this->traits_.set_supported_color_modes({light::ColorMode::ON_OFF}); }
   void setup_state(light::LightState *state) override;
+  void update_state(light::LightState *state) override;
   void write_state(light::LightState *state) override;
   light::LightTraits get_traits() override { return this->traits_; }
 

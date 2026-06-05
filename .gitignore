@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 
 tests/old/light.yaml
+.DS_Store

@@ -9,6 +9,7 @@ static const char *const TAG = "ble_adv_controller.button";
 void BleAdvButton::dump_config() { LOG_BUTTON("", "BLE advertising button", this); }
 
 void BleAdvButton::press_action() {
+  ESP_LOGI(TAG, "Press cmd=%u", static_cast<unsigned>(this->command_));
   if (this->command_ != CommandType::CUSTOM) {
     this->command(this->command_, this->args_);
     return;

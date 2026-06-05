@@ -5,16 +5,16 @@ esphome:
 
 external_components:
   - source:
-      type: git
-      url: https://github.com/Cbrogg/esphome-components.git
-      ref: codex/new-arch
+      type: local
+      path: ../../components
     components: [ble_adv_controller]
-    refresh: 0s
-  # Локальная отладка (вместо git):
+  # Git (после push фиксов):
   # - source:
-  #     type: local
-  #     path: ../../components
+  #     type: git
+  #     url: https://github.com/Cbrogg/esphome-components.git
+  #     ref: codex/new-arch
   #   components: [ble_adv_controller]
+  #   refresh: 0s
 
 esp32:
   board: esp32dev
@@ -125,6 +125,16 @@ button:
     name: "Сопряжение Люстра с вентилятором"
     ble_adv_controller_id: fan_light_controller
     cmd: pair
+
+  - platform: ble_adv_controller
+    name: "DEBUG Light ON"
+    ble_adv_controller_id: fan_light_controller
+    cmd: light_on
+
+  - platform: ble_adv_controller
+    name: "DEBUG Light OFF"
+    ble_adv_controller_id: fan_light_controller
+    cmd: light_off
 
 fan:
   - platform: ble_adv_controller

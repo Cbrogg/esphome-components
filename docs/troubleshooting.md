@@ -11,17 +11,19 @@
 
 Это значит, что `write_state()` не вызывается — команда из HA не доходит до output.
 
-1. Перепрошейте устройство с актуальным компонентом (output light не должен регистрироваться как отдельный component).
-2. При старте в логе должно быть: `Linked to light 'Спальня Люстра'` (для каждой лампы).
-3. При переключении в HA — строки `write_state`, `Switch ON/OFF`, `Queue packet`.
-4. В HA проверьте **entity_id** сцены/автоматизации: должна быть сущность ESPHome `light.<object_id>` (например `light.bedroom_light`), а не старая копия с другим именем.
-5. В Developer Tools → Services вызовите напрямую:
+1. Перепрошейте устройство с актуальным компонентом (`external_components` → `local` path или свежий git). Output light **не** регистрируется как отдельный component.
+2. Если в логе `OTA rollback detected! Rolled back from partition 'app1'` — устройство откатилось на старую прошивку. Залейте снова (`esphome upload`) и дайте ему поработать **60+ секунд** без перезагрузки.
+3. При старте для каждой лампы: `[I][ble_adv_controller.light]: Ready: '…' parent=0x…` и `[C][light]: Light '…'`.
+4. При переключении в HA — `update_state`, `Switch ON/OFF`, `LIGHT_WCOLOR`, `Queue packet`.
+5. Проверьте **entity_id**: для `id: fan_light` в YAML это `light.fan_light` («Люстра с вентилятором»), не старые сущности вроде «Люстра спальня».
+6. Обход HA: кнопки **DEBUG Light ON/OFF** — в serial должны быть `Press cmd=13/14` и `Queue packet`.
+7. Developer Tools → Services:
    ```yaml
    service: light.turn_on
    target:
-     entity_id: light.bedroom_light
+     entity_id: light.fan_light
    ```
-   Если в serial появились логи light — проблема в сцене/группе HA, не в прошивке.
+   Если логи light появились — проблема в сцене/группе HA, не в прошивке.
 
 ## Cold/warm перепутаны
 

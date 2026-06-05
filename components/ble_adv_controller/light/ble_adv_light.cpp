@@ -46,23 +46,23 @@ void BleAdvLight::set_traits(float cold_white_temperature, float warm_white_temp
 
 void BleAdvLight::setup_state(light::LightState *state) {
   this->state_ = state;
-  ESP_LOGCONFIG(TAG, "BLE advertising light (output v3):");
-  ESP_LOGCONFIG(TAG, "  Linked to light '%s', parent=%p", state->get_name().c_str(),
-                static_cast<void *>(this->parent_));
-  ESP_LOGCONFIG(TAG, "  Cold white: %.1f mireds", this->traits_.get_min_mireds());
-  ESP_LOGCONFIG(TAG, "  Warm white: %.1f mireds", this->traits_.get_max_mireds());
-  ESP_LOGCONFIG(TAG, "  Minimum brightness: %.0f%%", this->min_brightness_ * 100.0F);
+  ESP_LOGI(TAG, "Ready: '%s' parent=%p cw=%.0f ww=%.0f min_br=%.0f%%", state->get_name().c_str(),
+           static_cast<void *>(this->parent_), this->traits_.get_min_mireds(), this->traits_.get_max_mireds(),
+           this->min_brightness_ * 100.0F);
 }
 
 void BleAdvLight::update_state(light::LightState *state) {
-  ESP_LOGD(TAG, "update_state '%s' on=%s", state->get_name().c_str(),
-           state->current_values.is_on() ? "true" : "false");
-}
-
-void BleAdvLight::write_state(light::LightState *state) {
-  ESP_LOGI(TAG, "write_state '%s' on=%s br=%.0f%%", state->get_name().c_str(),
+  ESP_LOGD(TAG, "update_state '%s' on=%s br=%.0f%%", state->get_name().c_str(),
            state->current_values.is_on() ? "true" : "false",
            state->current_values.get_brightness() * 100.0F);
+  // HA/API applies changes via set_immediately_ → update_state; write_state may not run
+  // if the light loop is idle. Apply BLE commands here (same pattern as addressable_light).
+  this->apply_state(state);
+}
+
+void BleAdvLight::write_state(light::LightState *state) { this->apply_state(state); }
+
+void BleAdvLight::apply_state(light::LightState *state) {
   if (!state->current_values.is_on()) {
     if (!this->is_off_) {
       ESP_LOGI(TAG, "Switch OFF");
@@ -151,10 +151,12 @@ void BleAdvSecLight::setup_state(light::LightState *state) {
                 static_cast<void *>(this->parent_));
 }
 
-void BleAdvSecLight::write_state(light::LightState *state) {
+void BleAdvSecLight::update_state(light::LightState *state) {
   bool enabled;
   state->current_values_as_binary(&enabled);
   this->send_command(enabled ? CommandType::LIGHT_SEC_ON : CommandType::LIGHT_SEC_OFF);
 }
+
+void BleAdvSecLight::write_state(light::LightState *state) { this->update_state(state); }
 
 }  // namespace esphome::ble_adv_controller

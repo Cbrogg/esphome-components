@@ -17,6 +17,9 @@ from ..const import (
     CONF_BLE_ADV_SPLIT_DIM_CCT,
 )
 
+CODEOWNERS = ["@esphome/core"]
+DEPENDENCIES = ["light"]
+
 BleAdvLight = ble_adv_controller_ns.class_(
     "BleAdvLight", light.LightOutput, cg.Parented.template(BleAdvController)
 )
