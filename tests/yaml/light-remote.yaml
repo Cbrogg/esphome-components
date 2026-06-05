@@ -1,0 +1,137 @@
+esphome:
+  name: light
+  friendly_name: Light
+  min_version: 2026.5.2
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/Cbrogg/esphome-components.git
+      ref: codex/new-arch
+    components: [ble_adv_controller]
+    refresh: 0s
+  # Локальная отладка (вместо git):
+  # - source:
+  #     type: local
+  #     path: ../../components
+  #   components: [ble_adv_controller]
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+esp32_ble:
+  advertising: false
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "R6rBQey/ekYVc4OWdgKP6J4rewCS4ou+ZFOi5NIPmn8="
+
+ota:
+  - platform: esphome
+    password: "96da0335e23574a8321bcbfec378c9ab"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Light Fallback Hotspot"
+    password: "HIF6XsAO47U0"
+
+captive_portal:
+
+ble_adv_controller:
+  # - id: kitchen_controller_1
+  #   encoding: lampsmart_pro
+  #   variant: v3
+  #   duration: 200ms
+  #   max_duration: 3s
+  #   show_config: false
+
+  # - id: kitchen_controller_2
+  #   encoding: lampsmart_pro
+  #   variant: v3
+  #   duration: 200ms
+  #   max_duration: 3s
+  #   show_config: false
+
+  # - id: bedroom_controller
+  #   encoding: lampsmart_pro
+  #   variant: v3
+  #   duration: 200ms
+  #   max_duration: 3s
+  #   show_config: false
+
+  - id: fan_light_controller
+    encoding: fanlamp_pro
+    variant: v3
+    duration: 200ms
+    max_duration: 3s
+    show_config: true
+
+light:
+  # - platform: ble_adv_controller
+  #   id: kitchen_light_1
+  #   name: "Кухня Люстра 1"
+  #   ble_adv_controller_id: kitchen_controller_1
+  #   min_brightness: 1%
+  #   constant_brightness: false
+
+  # - platform: ble_adv_controller
+  #   id: kitchen_light_2
+  #   name: "Кухня Люстра 2"
+  #   ble_adv_controller_id: kitchen_controller_2
+  #   min_brightness: 1%
+  #   constant_brightness: false
+
+  # - platform: ble_adv_controller
+  #   id: bedroom_light
+  #   name: "Спальня Люстра"
+  #   ble_adv_controller_id: bedroom_controller
+  #   min_brightness: 1%
+  #   constant_brightness: false
+
+  # HA entity_id: light.fan_light (не старая «Люстра спальня» / light.bedroom_light)
+  - platform: ble_adv_controller
+    id: fan_light
+    name: "Люстра с вентилятором"
+    ble_adv_controller_id: fan_light_controller
+    min_brightness: 1%
+    constant_brightness: false
+
+button:
+  # - platform: ble_adv_controller
+  #   name: "Сопряжение Кухня 1"
+  #   ble_adv_controller_id: kitchen_controller_1
+  #   cmd: pair
+
+  # - platform: ble_adv_controller
+  #   name: "Сопряжение Кухня 2"
+  #   ble_adv_controller_id: kitchen_controller_2
+  #   cmd: pair
+
+  # - platform: ble_adv_controller
+  #   name: "Сопряжение Спальня"
+  #   ble_adv_controller_id: bedroom_controller
+  #   cmd: pair
+
+  - platform: ble_adv_controller
+    name: "Сопряжение Люстра с вентилятором"
+    ble_adv_controller_id: fan_light_controller
+    cmd: pair
+
+fan:
+  - platform: ble_adv_controller
+    id: fan_light_fan
+    name: "Вентилятор люстры"
+    ble_adv_controller_id: fan_light_controller
+    speed_count: 6
+    use_direction: true
+    use_oscillation: false
+    forced_refresh_on_start: true

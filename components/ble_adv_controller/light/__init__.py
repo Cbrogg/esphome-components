@@ -10,7 +10,7 @@ from esphome.const import (
     CONF_WARM_WHITE_COLOR_TEMPERATURE,
 )
 
-from .. import BleAdvController, BleAdvEntity, ble_adv_controller_ns
+from .. import BleAdvController, ble_adv_controller_ns
 from ..const import (
     CONF_BLE_ADV_CONTROLLER_ID,
     CONF_BLE_ADV_SECONDARY,
@@ -18,10 +18,10 @@ from ..const import (
 )
 
 BleAdvLight = ble_adv_controller_ns.class_(
-    "BleAdvLight", light.LightOutput, BleAdvEntity
+    "BleAdvLight", light.LightOutput, cg.Parented.template(BleAdvController)
 )
 BleAdvSecLight = ble_adv_controller_ns.class_(
-    "BleAdvSecLight", light.LightOutput, BleAdvEntity
+    "BleAdvSecLight", light.LightOutput, cg.Parented.template(BleAdvController)
 )
 
 PARENT_SCHEMA = cv.Schema(
