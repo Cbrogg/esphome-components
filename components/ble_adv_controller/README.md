@@ -107,10 +107,20 @@ then:
 
 При `show_config: true` (по умолчанию) автоматически создаются:
 
-- **Diagnostic:** Protocol, TX Counter, Forced ID, Queue Length, Last Packet
-- **Config:** Duration, Max Duration, Index, Forced ID, Encoding, Variant
+- **Diagnostic:** Protocol, Variant, Transmissions, Device ID (если `show_config: false`), Last Packet и Command Queue (скрыты по умолчанию)
+- **Config:** Advertising Duration, Max Advertising Duration, Device Index, Device ID, Protocol, Variant
 
-При `show_config: false` остаются только diagnostic entities.
+При `show_config: false` остаются только основные diagnostic entities без config-редакторов.
+
+Опциональный `name:` у контроллера задаёт префикс для diagnostic/config сущностей — удобно при нескольких контроллерах на одном ESP:
+
+```yaml
+ble_adv_controller:
+  - id: fan_light_controller
+    name: "Люстра с вентилятором"
+    encoding: fanlamp_pro
+    show_config: false
+```
 
 ## Pairing
 

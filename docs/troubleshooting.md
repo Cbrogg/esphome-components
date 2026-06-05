@@ -16,7 +16,7 @@
 3. При старте для каждой лампы: `[I][ble_adv_controller.light]: Ready: '…' parent=0x…` и `[C][light]: Light '…'`.
 4. При переключении в HA — `update_state`, `Switch ON/OFF`, `LIGHT_WCOLOR`, `Queue packet`.
 5. Проверьте **entity_id**: для `id: fan_light` в YAML это `light.fan_light` («Люстра с вентилятором»), не старые сущности вроде «Люстра спальня».
-6. Обход HA: кнопки **DEBUG Light ON/OFF** — в serial должны быть `Press cmd=13/14` и `Queue packet`.
+6. Обход HA: Developer Tools → Services → `ble_adv_controller.command` с `command: 13/14`, либо временная debug-кнопка (`cmd: light_on` / `light_off`) — по умолчанию она скрыта в HA (`disabled_by_default`). В serial при `logger: DEBUG` — `Press cmd=13/14` и `Queue packet`.
 7. Developer Tools → Services:
    ```yaml
    service: light.turn_on
@@ -76,7 +76,7 @@ fan:
 
 1. Строки `ESPHome Logs … CONNECTION_CLOSED` от **192.168.1.x** — это обрыв **просмотра логов** (`esphome logs` / IDE), не разрыв Home Assistant. HA в логе: `Home Assistant … connected` / `disconnected`.
 2. Слабый Wi‑Fi (ниже −70 dBm) даёт задержки API — улучшите сигнал или перенесите ESP ближе к роутеру.
-3. Уровень `logger: DEBUG` и `show_config: true` увеличивают нагрузку — для эксплуатации используйте `level: INFO` и `show_config: false`.
+3. Уровень `logger: DEBUG` и `show_config: true` увеличивают нагрузку — для эксплуатации используйте `level: INFO` и `show_config: false`. Диагностические сущности **Last Packet** и **Command Queue** по умолчанию скрыты в HA; включите их в настройках устройства при отладке.
 4. Частые команды света (ползунок яркости) грузят BLE-очередь — в прошивке есть throttle 200 ms между промежуточными шагами; финальное значение всё равно уходит.
 
 ## Предупреждения в логах

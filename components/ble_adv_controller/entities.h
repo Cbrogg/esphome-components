@@ -16,6 +16,13 @@ class BleAdvProtocolTextSensor : public text_sensor::TextSensor,
   void update() override;
 };
 
+class BleAdvVariantTextSensor : public text_sensor::TextSensor,
+                                public PollingComponent,
+                                public Parented<BleAdvController> {
+ public:
+  void update() override;
+};
+
 class BleAdvLastPacketTextSensor : public text_sensor::TextSensor,
                                    public PollingComponent,
                                    public Parented<BleAdvController> {
@@ -23,12 +30,14 @@ class BleAdvLastPacketTextSensor : public text_sensor::TextSensor,
   void update() override;
 };
 
-class BleAdvTxCountSensor : public sensor::Sensor, public PollingComponent, public Parented<BleAdvController> {
+class BleAdvForcedIdTextSensor : public text_sensor::TextSensor,
+                                 public PollingComponent,
+                                 public Parented<BleAdvController> {
  public:
   void update() override;
 };
 
-class BleAdvForcedIdSensor : public sensor::Sensor, public PollingComponent, public Parented<BleAdvController> {
+class BleAdvTxCountSensor : public sensor::Sensor, public PollingComponent, public Parented<BleAdvController> {
  public:
   void update() override;
 };

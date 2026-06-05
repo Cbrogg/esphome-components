@@ -70,6 +70,7 @@ ble_adv_controller:
   #   show_config: false
 
   - id: fan_light_controller
+    name: "Люстра с вентилятором"
     encoding: fanlamp_pro
     variant: v3
     duration: 200ms
@@ -126,16 +127,6 @@ button:
     name: "Сопряжение Люстра с вентилятором"
     ble_adv_controller_id: fan_light_controller
     cmd: pair
-
-  - platform: ble_adv_controller
-    name: "DEBUG Light ON"
-    ble_adv_controller_id: fan_light_controller
-    cmd: light_on
-
-  - platform: ble_adv_controller
-    name: "DEBUG Light OFF"
-    ble_adv_controller_id: fan_light_controller
-    cmd: light_off
 
 fan:
   - platform: ble_adv_controller

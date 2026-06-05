@@ -24,11 +24,15 @@ from esphome.const import (
     CONF_DISABLED_BY_DEFAULT,
     CONF_ENTITY_CATEGORY,
     CONF_FORCE_UPDATE,
+    CONF_ICON,
     CONF_MODE,
     CONF_NAME,
     CONF_UPDATE_INTERVAL,
+    CONF_ACCURACY_DECIMALS,
+    CONF_STATE_CLASS,
     ENTITY_CATEGORY_CONFIG,
     ENTITY_CATEGORY_DIAGNOSTIC,
+    STATE_CLASS_TOTAL_INCREASING,
 )
 
 from .const import (
@@ -80,20 +84,26 @@ BleAdvProtocolTextSensor = ble_adv_controller_ns.class_(
     cg.PollingComponent,
     cg.Parented.template(BleAdvController),
 )
+BleAdvVariantTextSensor = ble_adv_controller_ns.class_(
+    "BleAdvVariantTextSensor",
+    text_sensor.TextSensor,
+    cg.PollingComponent,
+    cg.Parented.template(BleAdvController),
+)
 BleAdvLastPacketTextSensor = ble_adv_controller_ns.class_(
     "BleAdvLastPacketTextSensor",
     text_sensor.TextSensor,
     cg.PollingComponent,
     cg.Parented.template(BleAdvController),
 )
-BleAdvTxCountSensor = ble_adv_controller_ns.class_(
-    "BleAdvTxCountSensor",
-    sensor.Sensor,
+BleAdvForcedIdTextSensor = ble_adv_controller_ns.class_(
+    "BleAdvForcedIdTextSensor",
+    text_sensor.TextSensor,
     cg.PollingComponent,
     cg.Parented.template(BleAdvController),
 )
-BleAdvForcedIdSensor = ble_adv_controller_ns.class_(
-    "BleAdvForcedIdSensor",
+BleAdvTxCountSensor = ble_adv_controller_ns.class_(
+    "BleAdvTxCountSensor",
     sensor.Sensor,
     cg.PollingComponent,
     cg.Parented.template(BleAdvController),
@@ -186,6 +196,7 @@ def _controller_schema(encoding, definition):
             ),
             cv.Optional(CONF_REVERSED, default=False): cv.boolean,
             cv.Optional(CONF_BLE_ADV_SHOW_CONFIG, default=True): cv.boolean,
+            cv.Optional(CONF_NAME): cv.string,
         }
     ).extend(cv.COMPONENT_SCHEMA)
 
@@ -259,20 +270,43 @@ def _entity_config(entity_id, name, *, entity_category, **extra):
     }
 
 
-async def _register_polling_text_sensor(parent, entity_id, name):
+def _entity_label(config, suffix):
+    label = config.get(CONF_NAME)
+    if label:
+        return f"{label} {suffix}"
+    return suffix
+
+
+async def _register_polling_text_sensor(
+    parent, entity_id, name, *, icon=None, disabled_by_default=False
+):
     CORE.component_ids.add(entity_id.id)
     entity_config = _entity_config(
         entity_id,
         name,
         entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
-        **{CONF_UPDATE_INTERVAL: DIAGNOSTIC_POLL_INTERVAL},
+        **{
+            CONF_UPDATE_INTERVAL: DIAGNOSTIC_POLL_INTERVAL,
+            CONF_DISABLED_BY_DEFAULT: disabled_by_default,
+        },
     )
+    if icon is not None:
+        entity_config[CONF_ICON] = icon
     var = await text_sensor.new_text_sensor(entity_config)
     await cg.register_parented(var, parent)
     await cg.register_component(var, entity_config)
 
 
-async def _register_polling_sensor(parent, entity_id, name):
+async def _register_polling_sensor(
+    parent,
+    entity_id,
+    name,
+    *,
+    icon=None,
+    accuracy_decimals=0,
+    state_class=None,
+    disabled_by_default=False,
+):
     CORE.component_ids.add(entity_id.id)
     entity_config = _entity_config(
         entity_id,
@@ -281,45 +315,66 @@ async def _register_polling_sensor(parent, entity_id, name):
         **{
             CONF_UPDATE_INTERVAL: DIAGNOSTIC_POLL_INTERVAL,
             CONF_FORCE_UPDATE: False,
+            CONF_ACCURACY_DECIMALS: accuracy_decimals,
+            CONF_DISABLED_BY_DEFAULT: disabled_by_default,
         },
     )
+    if icon is not None:
+        entity_config[CONF_ICON] = icon
+    if state_class is not None:
+        entity_config[CONF_STATE_CLASS] = state_class
     var = await sensor.new_sensor(entity_config)
     await cg.register_parented(var, parent)
     await cg.register_component(var, entity_config)
 
 
-async def _register_diagnostic_entities(parent, config):
+async def _register_diagnostic_entities(parent, config, *, show_config):
     base = config[CONF_ID].id
 
     await _register_polling_text_sensor(
         parent,
         ID(f"{base}_protocol_text", type=BleAdvProtocolTextSensor),
-        f"{base} Protocol",
+        _entity_label(config, "Protocol"),
+        icon="mdi:bluetooth-connect",
     )
     await _register_polling_text_sensor(
         parent,
-        ID(f"{base}_last_packet", type=BleAdvLastPacketTextSensor),
-        f"{base} Last Packet",
+        ID(f"{base}_variant_text", type=BleAdvVariantTextSensor),
+        _entity_label(config, "Variant"),
+        icon="mdi:tag-outline",
     )
+    if not show_config:
+        await _register_polling_text_sensor(
+            parent,
+            ID(f"{base}_forced_id_diag", type=BleAdvForcedIdTextSensor),
+            _entity_label(config, "Device ID"),
+            icon="mdi:identifier",
+        )
     await _register_polling_sensor(
         parent,
         ID(f"{base}_tx_count", type=BleAdvTxCountSensor),
-        f"{base} TX Counter",
-    )
-    await _register_polling_sensor(
-        parent,
-        ID(f"{base}_forced_id_diag", type=BleAdvForcedIdSensor),
-        f"{base} Forced ID",
+        _entity_label(config, "Transmissions"),
+        icon="mdi:counter",
+        state_class=STATE_CLASS_TOTAL_INCREASING,
     )
     await _register_polling_sensor(
         parent,
         ID(f"{base}_queue_len", type=BleAdvQueueLengthSensor),
-        f"{base} Queue Length",
+        _entity_label(config, "Command Queue"),
+        icon="mdi:format-list-numbered",
+        disabled_by_default=True,
+    )
+    await _register_polling_text_sensor(
+        parent,
+        ID(f"{base}_last_packet", type=BleAdvLastPacketTextSensor),
+        _entity_label(config, "Last Packet"),
+        icon="mdi:radio-tower",
+        disabled_by_default=True,
     )
 
 
 async def _register_config_number(
-    parent, entity_id, name, *, min_value, max_value, step=1, unit=None
+    parent, entity_id, name, *, min_value, max_value, step=1, unit=None, icon=None
 ):
     entity_config = _entity_config(
         entity_id,
@@ -329,6 +384,8 @@ async def _register_config_number(
     )
     if unit is not None:
         entity_config["unit_of_measurement"] = unit
+    if icon is not None:
+        entity_config[CONF_ICON] = icon
     var = cg.new_Pvariable(entity_id)
     await cg.register_parented(var, parent)
     await number.register_number(
@@ -337,10 +394,12 @@ async def _register_config_number(
     return var
 
 
-async def _register_config_select(parent, entity_id, name, options):
+async def _register_config_select(parent, entity_id, name, options, *, icon=None):
     entity_config = _entity_config(
         entity_id, name, entity_category=ENTITY_CATEGORY_CONFIG
     )
+    if icon is not None:
+        entity_config[CONF_ICON] = icon
     var = cg.new_Pvariable(entity_id)
     await cg.register_parented(var, parent)
     await select.register_select(var, entity_config, options=options)
@@ -360,20 +419,22 @@ async def _register_config_entities(parent, config):
     duration = await _register_config_number(
         parent,
         ID(f"{base}_duration", type=BleAdvDurationNumber),
-        f"{base} Duration",
+        _entity_label(config, "Advertising Duration"),
         min_value=100,
         max_value=500,
         unit="ms",
+        icon="mdi:timer-outline",
     )
     cg.add(duration.publish_state(config[CONF_DURATION].total_milliseconds))
 
     max_duration = await _register_config_number(
         parent,
         ID(f"{base}_max_duration", type=BleAdvMaxDurationNumber),
-        f"{base} Max Duration",
+        _entity_label(config, "Max Advertising Duration"),
         min_value=300,
         max_value=10000,
         unit="ms",
+        icon="mdi:timer-sand",
     )
     cg.add(
         max_duration.publish_state(config[CONF_BLE_ADV_MAX_DURATION].total_milliseconds)
@@ -382,34 +443,38 @@ async def _register_config_entities(parent, config):
     index = await _register_config_number(
         parent,
         ID(f"{base}_index", type=BleAdvIndexNumber),
-        f"{base} Index",
+        _entity_label(config, "Device Index"),
         min_value=0,
         max_value=255,
+        icon="mdi:numeric",
     )
     cg.add(index.publish_state(config[CONF_INDEX]))
 
     forced_id = await _register_config_number(
         parent,
         ID(f"{base}_forced_id_cfg", type=BleAdvForcedIdNumber),
-        f"{base} Forced ID Config",
+        _entity_label(config, "Device ID"),
         min_value=0,
         max_value=0xFFFFFFFF,
+        icon="mdi:identifier",
     )
     cg.add(forced_id.publish_state(forced_id_value))
 
     encoding_select = await _register_config_select(
         parent,
         ID(f"{base}_encoding", type=BleAdvEncodingSelect),
-        f"{base} Encoding",
+        _entity_label(config, "Encoding"),
         list(ENCODINGS.keys()),
+        icon="mdi:bluetooth-connect",
     )
     cg.add(encoding_select.publish_state(encoding))
 
     variant_select = await _register_config_select(
         parent,
         ID(f"{base}_variant", type=BleAdvVariantSelect),
-        f"{base} Variant",
+        _entity_label(config, "Variant"),
         variants,
+        icon="mdi:tag-outline",
     )
     cg.add(variant_select.publish_state(config[CONF_VARIANT]))
 
@@ -431,7 +496,9 @@ async def to_code(config):
     else:
         cg.add(var.set_forced_id(config[CONF_ID].id))
 
-    await _register_diagnostic_entities(var, config)
+    await _register_diagnostic_entities(
+        var, config, show_config=config[CONF_BLE_ADV_SHOW_CONFIG]
+    )
     if config[CONF_BLE_ADV_SHOW_CONFIG]:
         await _register_config_entities(var, config)
 

@@ -72,7 +72,7 @@ void BleAdvLight::apply_state(light::LightState *state) {
 
   if (!state->current_values.is_on()) {
     if (!this->is_off_) {
-      ESP_LOGI(TAG, "Switch OFF");
+      ESP_LOGD(TAG, "Switch OFF");
       this->send_command(CommandType::LIGHT_OFF);
       this->last_apply_ms_ = millis();
     }
@@ -84,7 +84,7 @@ void BleAdvLight::apply_state(light::LightState *state) {
 
   const bool was_off = this->is_off_;
   if (was_off) {
-    ESP_LOGI(TAG, "Switch ON");
+    ESP_LOGD(TAG, "Switch ON");
     this->send_command(CommandType::LIGHT_ON);
     this->is_off_ = false;
     this->last_apply_ms_ = millis();
@@ -146,19 +146,19 @@ void BleAdvLight::apply_state(light::LightState *state) {
       cold_white = state->gamma_correct_lut(cold_white);
       warm_white = state->gamma_correct_lut(warm_white);
     }
-    ESP_LOGI(TAG, "LIGHT_WCOLOR cold=%.0f%% warm=%.0f%%", cold_white * 100.0F, warm_white * 100.0F);
+    ESP_LOGD(TAG, "LIGHT_WCOLOR cold=%.0f%% warm=%.0f%%", cold_white * 100.0F, warm_white * 100.0F);
     this->send_command(CommandType::LIGHT_WCOLOR, static_cast<uint8_t>(cold_white * 255.0F),
                        static_cast<uint8_t>(warm_white * 255.0F));
     this->last_apply_ms_ = millis();
     return;
   }
   if (temperature_diff != 0 || was_off) {
-    ESP_LOGI(TAG, "LIGHT_CCT warm=%.0f%%", warm * 100.0F);
+    ESP_LOGD(TAG, "LIGHT_CCT warm=%.0f%%", warm * 100.0F);
     this->send_command(CommandType::LIGHT_CCT, static_cast<uint8_t>(warm * 255.0F));
     this->last_apply_ms_ = millis();
   }
   if (brightness_diff != 0 || was_off) {
-    ESP_LOGI(TAG, "LIGHT_DIM brightness=%.0f%%", brightness * 100.0F);
+    ESP_LOGD(TAG, "LIGHT_DIM brightness=%.0f%%", brightness * 100.0F);
     this->send_command(CommandType::LIGHT_DIM, static_cast<uint8_t>(brightness * 255.0F));
     this->last_apply_ms_ = millis();
   }

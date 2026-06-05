@@ -3,8 +3,12 @@ import esphome.config_validation as cv
 from esphome.components import button
 from esphome.const import (
     CONF_ARGS,
+    CONF_DISABLED_BY_DEFAULT,
+    CONF_ENTITY_CATEGORY,
+    CONF_ICON,
     DEVICE_CLASS_IDENTIFY,
     ENTITY_CATEGORY_CONFIG,
+    ENTITY_CATEGORY_DIAGNOSTIC,
 )
 
 from .. import BleAdvController, BleAdvEntity, ble_adv_controller_ns
@@ -18,6 +22,8 @@ from ..const import (
 BleAdvButton = ble_adv_controller_ns.class_(
     "BleAdvButton", button.Button, BleAdvEntity
 )
+
+USER_FACING_COMMANDS = {"pair", "unpair"}
 
 
 def validate_command(value):
@@ -39,11 +45,7 @@ def validate_args(config):
 
 
 CONFIG_SCHEMA = cv.All(
-    button.button_schema(
-        BleAdvButton,
-        device_class=DEVICE_CLASS_IDENTIFY,
-        entity_category=ENTITY_CATEGORY_CONFIG,
-    )
+    button.button_schema(BleAdvButton)
     .extend(
         {
             cv.Required(CONF_BLE_ADV_CONTROLLER_ID): cv.use_id(BleAdvController),
@@ -56,7 +58,22 @@ CONFIG_SCHEMA = cv.All(
 )
 
 
+def _apply_button_presentation(config):
+    cmd = config[CONF_BLE_ADV_CMD]
+    if cmd in USER_FACING_COMMANDS:
+        config[CONF_ENTITY_CATEGORY] = ENTITY_CATEGORY_CONFIG
+        config[CONF_ICON] = (
+            "mdi:link-variant" if cmd == "pair" else "mdi:link-variant-off"
+        )
+        config["device_class"] = DEVICE_CLASS_IDENTIFY
+        return
+    config[CONF_ENTITY_CATEGORY] = ENTITY_CATEGORY_DIAGNOSTIC
+    config[CONF_DISABLED_BY_DEFAULT] = True
+    config[CONF_ICON] = "mdi:bug-outline"
+
+
 async def to_code(config):
+    _apply_button_presentation(config)
     var = await button.new_button(config)
     await cg.register_parented(var, config[CONF_BLE_ADV_CONTROLLER_ID])
     await cg.register_component(var, config)
