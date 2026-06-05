@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome import CORE
+import esphome.final_validate as fv
 from esphome.components import fan
 from esphome.const import CONF_ID
 
@@ -39,18 +39,11 @@ CONFIG_SCHEMA = (
 )
 
 
-def _validate_fan(config):
+def _final_validate_fan(config):
     controller_id = config[CONF_BLE_ADV_CONTROLLER_ID]
-    controllers = CORE.config.get("ble_adv_controller", [])
-    controller = next(
-        (item for item in controllers if item[CONF_ID] == controller_id),
-        None,
-    )
-    if controller is None:
-        raise cv.Invalid(
-            f"ble_adv_controller '{controller_id}' not found",
-            path=[CONF_BLE_ADV_CONTROLLER_ID],
-        )
+    fconf = fv.full_config.get()
+    controller_path = fconf.get_path_for_id(controller_id)[:-1]
+    controller = fconf.get_config_for_path(controller_path)
     encoding = controller[CONF_BLE_ADV_ENCODING]
     if encoding not in FAN_DIR_OSC_ENCODINGS:
         if config[CONF_BLE_ADV_DIRECTION_SUPPORTED]:
@@ -66,7 +59,7 @@ def _validate_fan(config):
     return config
 
 
-CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, _validate_fan)
+FINAL_VALIDATE_SCHEMA = _final_validate_fan
 
 
 async def to_code(config):
