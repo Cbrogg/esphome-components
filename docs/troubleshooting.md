@@ -42,6 +42,17 @@ fan:
     use_oscillation: false
 ```
 
+## `esp_ble_gap_config_adv_data_raw failed: ESP_ERR_INVALID_STATE`
+
+Пакеты формируются (TX Counter растёт, Last Packet меняется), но в эфир не уходят. Причина — конфликт с рекламой `esp32_ble`.
+
+Что делать:
+
+1. Обновите компонент до версии с исправленным `ble_adv_handler` (raw callback + retry без потери пакетов).
+2. Перепрошейте устройство.
+3. В логе должны появиться `ADV_DATA_RAW_SET_COMPLETE` / `ADV_START_COMPLETE` без ошибок.
+4. Queue Length должен возвращаться к 0 после команды.
+
 ## Предупреждения в логах
 
 ```

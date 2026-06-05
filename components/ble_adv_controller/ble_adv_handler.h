@@ -40,6 +40,9 @@ class BleAdvHandler : public Component {
     STOPPING,
   };
 
+  static constexpr uint8_t MAX_CONFIG_FAILURES = 8;
+  static constexpr uint32_t ACQUIRE_SETTLE_MS = 30;
+
   struct ScheduledPacket {
     ScheduledPacket(uint16_t message_id, protocol::AdvPacket packet)
         : message_id(message_id), packet(std::move(packet)) {}
@@ -48,21 +51,26 @@ class BleAdvHandler : public Component {
     protocol::AdvPacket packet;
     bool processed{false};
     bool remove{false};
+    uint8_t config_failures{0};
   };
 
-  void configure_front_();
-  void acquire_advertiser_();
+  void on_ble_parent_advertising_slot_(bool advertise);
+  void begin_acquire_();
+  bool configure_front_();
   void request_stop_();
   void finish_front_();
   void restore_esphome_advertising_();
+  void handle_config_failure_();
 
   protocol::Registry registry_;
   esp32_ble::ESP32BLE *ble_parent_{nullptr};
   std::list<ScheduledPacket> packets_;
   uint16_t next_message_id_{0};
   uint32_t packet_started_at_{0};
+  uint32_t acquire_started_at_{0};
   AdvertiserState state_{AdvertiserState::IDLE};
   bool owns_advertiser_{false};
+  bool stop_already_idle_{false};
   std::string last_packet_hex_;
 
   esp_ble_adv_params_t advertising_params_{
