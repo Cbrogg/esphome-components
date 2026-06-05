@@ -22,6 +22,7 @@ esp32:
     type: arduino
 
 logger:
+  level: INFO
 
 esp32_ble:
   advertising: false
@@ -73,7 +74,7 @@ ble_adv_controller:
     variant: v3
     duration: 200ms
     max_duration: 3s
-    show_config: true
+    show_config: false
 
 light:
   # - platform: ble_adv_controller

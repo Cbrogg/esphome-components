@@ -72,6 +72,13 @@ fan:
 4. В логе должно появиться `Advertising started` (event-driven GAP) без `esp_ble_gap_config_adv_data_raw failed`.
 5. Queue Length должен возвращаться к 0 после команды.
 
+## HA показывает «недоступно», в serial — `CONNECTION_CLOSED`
+
+1. Строки `ESPHome Logs … CONNECTION_CLOSED` от **192.168.1.x** — это обрыв **просмотра логов** (`esphome logs` / IDE), не разрыв Home Assistant. HA в логе: `Home Assistant … connected` / `disconnected`.
+2. Слабый Wi‑Fi (ниже −70 dBm) даёт задержки API — улучшите сигнал или перенесите ESP ближе к роутеру.
+3. Уровень `logger: DEBUG` и `show_config: true` увеличивают нагрузку — для эксплуатации используйте `level: INFO` и `show_config: false`.
+4. Частые команды света (ползунок яркости) грузят BLE-очередь — в прошивке есть throttle 200 ms между промежуточными шагами; финальное значение всё равно уходит.
+
 ## Предупреждения в логах
 
 ```

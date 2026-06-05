@@ -30,6 +30,7 @@ class BleAdvLight : public light::LightOutput, public Parented<BleAdvController>
   bool is_off_{true};
   float brightness_{0};
   float warm_color_{0};
+  uint32_t last_apply_ms_{0};
 };
 
 class BleAdvSecLight : public light::LightOutput, public Parented<BleAdvController> {

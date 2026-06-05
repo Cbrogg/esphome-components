@@ -1,5 +1,6 @@
 #include "ble_adv_light.h"
 
+#include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 
 #include <cmath>
@@ -7,6 +8,7 @@
 namespace esphome::ble_adv_controller {
 
 static const char *const TAG = "ble_adv_controller.light";
+static constexpr uint32_t APPLY_THROTTLE_MS = 200;
 
 namespace {
 float clamp_unit(float value) { return std::max(0.0F, std::min(1.0F, value)); }
@@ -60,13 +62,19 @@ void BleAdvLight::update_state(light::LightState *state) {
   this->apply_state(state);
 }
 
-void BleAdvLight::write_state(light::LightState *state) { this->apply_state(state); }
+void BleAdvLight::write_state(light::LightState *state) {
+  // Hardware is driven from update_state(); loop may call write_state again — skip to avoid double BLE load.
+  (void) state;
+}
 
 void BleAdvLight::apply_state(light::LightState *state) {
+  const bool final_update = state->current_values == state->remote_values;
+
   if (!state->current_values.is_on()) {
     if (!this->is_off_) {
       ESP_LOGI(TAG, "Switch OFF");
       this->send_command(CommandType::LIGHT_OFF);
+      this->last_apply_ms_ = millis();
     }
     this->is_off_ = true;
     this->brightness_ = 0;
@@ -79,6 +87,15 @@ void BleAdvLight::apply_state(light::LightState *state) {
     ESP_LOGI(TAG, "Switch ON");
     this->send_command(CommandType::LIGHT_ON);
     this->is_off_ = false;
+    this->last_apply_ms_ = millis();
+  }
+
+  if (!was_off && !final_update) {
+    const uint32_t now = millis();
+    if (now - this->last_apply_ms_ < APPLY_THROTTLE_MS) {
+      ESP_LOGV(TAG, "Throttled (%ums since last BLE)", now - this->last_apply_ms_);
+      return;
+    }
   }
 
   const float brightness =
@@ -93,7 +110,6 @@ void BleAdvLight::apply_state(light::LightState *state) {
 
   const float brightness_diff = std::fabs(this->brightness_ - brightness) * 100.0F;
   const float temperature_diff = std::fabs(this->warm_color_ - warm) * 100.0F;
-  const bool final_update = state->current_values == state->remote_values;
   if (!was_off &&
       ((brightness_diff < 3 && temperature_diff < 3 && !final_update) ||
        (final_update && brightness_diff == 0 && temperature_diff == 0))) {
@@ -133,15 +149,18 @@ void BleAdvLight::apply_state(light::LightState *state) {
     ESP_LOGI(TAG, "LIGHT_WCOLOR cold=%.0f%% warm=%.0f%%", cold_white * 100.0F, warm_white * 100.0F);
     this->send_command(CommandType::LIGHT_WCOLOR, static_cast<uint8_t>(cold_white * 255.0F),
                        static_cast<uint8_t>(warm_white * 255.0F));
+    this->last_apply_ms_ = millis();
     return;
   }
   if (temperature_diff != 0 || was_off) {
     ESP_LOGI(TAG, "LIGHT_CCT warm=%.0f%%", warm * 100.0F);
     this->send_command(CommandType::LIGHT_CCT, static_cast<uint8_t>(warm * 255.0F));
+    this->last_apply_ms_ = millis();
   }
   if (brightness_diff != 0 || was_off) {
     ESP_LOGI(TAG, "LIGHT_DIM brightness=%.0f%%", brightness * 100.0F);
     this->send_command(CommandType::LIGHT_DIM, static_cast<uint8_t>(brightness * 255.0F));
+    this->last_apply_ms_ = millis();
   }
 }
 
@@ -157,6 +176,6 @@ void BleAdvSecLight::update_state(light::LightState *state) {
   this->send_command(enabled ? CommandType::LIGHT_SEC_ON : CommandType::LIGHT_SEC_OFF);
 }
 
-void BleAdvSecLight::write_state(light::LightState *state) { this->update_state(state); }
+void BleAdvSecLight::write_state(light::LightState *state) { (void) state; }
 
 }  // namespace esphome::ble_adv_controller
