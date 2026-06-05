@@ -1,0 +1,74 @@
+esphome:
+  name: ble-adv-full-arduino
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+    components: [ble_adv_controller]
+
+ble_adv_controller:
+  - id: controller
+    encoding: fanlamp_pro
+    variant: all
+    duration: 200ms
+    max_duration: 3s
+    seq_duration: 100ms
+    reversed: false
+    forced_id: 0x123456
+    index: 1
+
+light:
+  - platform: ble_adv_controller
+    id: main_light
+    name: Main Light
+    ble_adv_controller_id: controller
+    cold_white_color_temperature: 167 mireds
+    warm_white_color_temperature: 333 mireds
+  - platform: ble_adv_controller
+    id: secondary_light
+    name: Secondary Light
+    ble_adv_controller_id: controller
+    secondary: true
+
+fan:
+  - platform: ble_adv_controller
+    id: ceiling_fan
+    name: Ceiling Fan
+    ble_adv_controller_id: controller
+    speed_count: 6
+    use_direction: true
+    use_oscillation: true
+
+button:
+  - platform: ble_adv_controller
+    id: pair_button
+    name: Pair
+    ble_adv_controller_id: controller
+    cmd: pair
+  - platform: ble_adv_controller
+    id: custom_button
+    name: Custom
+    ble_adv_controller_id: controller
+    cmd: custom
+    args: [16, 0, 0, 0, 0]
+
+interval:
+  - interval: 60s
+    then:
+      - ble_adv_controller.pair: controller
+      - ble_adv_controller.unpair: controller
+      - ble_adv_controller.command:
+          id: controller
+          command: 16
+          arg0: 1
+      - ble_adv_controller.raw_decode:
+          id: controller
+          raw: "02.01.19.1B.03.F0.08.20.80.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00"

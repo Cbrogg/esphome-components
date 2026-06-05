@@ -3,6 +3,12 @@
 ## Цель
 Создать новый компонент, полностью совместимый с ESPHome 2026.5.2+, использующий только актуальные публичные API ESPHome.
 
+## Статус
+
+**Реализовано.**
+
+Protocol layer, общий GAP scheduler, YAML controller, native actions и smoke-конфигурации для ESP-IDF/Arduino. CI compile на ESPHome 2026.5.2 и 2026.4.5.
+
 ## Требования
 - Полный отказ от устаревших API:
   - FAN_SCHEMA

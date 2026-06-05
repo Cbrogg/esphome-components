@@ -1,0 +1,44 @@
+esphome:
+  name: ble-adv-ha-api-smoke
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+api:
+
+wifi:
+  ssid: "test-ssid"
+  password: "test-password"
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+    components: [ble_adv_controller]
+
+ble_adv_controller:
+  - id: controller
+    encoding: fanlamp_pro
+    variant: v3
+    show_config: true
+
+light:
+  - platform: ble_adv_controller
+    name: Main Light
+    ble_adv_controller_id: controller
+
+fan:
+  - platform: ble_adv_controller
+    name: Ceiling Fan
+    ble_adv_controller_id: controller
+    speed_count: 6
+
+button:
+  - platform: ble_adv_controller
+    name: Pair
+    ble_adv_controller_id: controller
+    cmd: pair

@@ -1,5 +1,20 @@
 # Этап 4. Интеграция с Home Assistant
 
+## Статус
+
+**Реализовано (CI). Аппаратный HA smoke — вне CI.**
+
+Нативные `LightOutput`, `Fan` и `Button`. Diagnostic/config entities автоматически создаются при `show_config: true`.
+
+### Критерии готовности
+
+- [x] Diagnostic: protocol, tx counter, forced id, queue length, last packet (text_sensor/sensor)
+- [x] Config Number/Select: duration, max_duration, encoding, variant, forced_id, index
+- [x] `show_config` в YAML schema (default `true`)
+- [x] `tests/yaml/ha-api-smoke.yaml` проходит `esphome config` в CI
+- [x] Pairing Guide, Troubleshooting, Supported Devices docs
+- [ ] Аппаратный smoke-тест с `api:` в Home Assistant — см. hardware-validation.md
+
 ## Цель
 Предоставить полноценные Home Assistant сущности поверх нового протокольного ядра.
 

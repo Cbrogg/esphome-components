@@ -1,5 +1,21 @@
 # Этап 5. Стратегия тестирования и контроль качества
 
+## Статус
+
+**Реализовано (CI). Hardware playbook — шаблон для ручного заполнения.**
+
+### Критерии готовности
+
+- [x] Protocol tests: encode/decode/roundtrip, golden samples, command matrix
+- [x] Runtime tests: queue dedup, duration logic, tx_count rollover
+- [x] Golden corpus в `tests/samples/`
+- [x] YAML smoke: minimal-idf, full-arduino, all-encodings, zhijia-fan, config-entities, ha-api-smoke
+- [x] Compile matrix: ESPHome 2026.5.2 + 2026.4.5
+- [x] YAML matrix: ESPHome 2026.3.3 / 2026.4.5 / 2026.5.2
+- [x] Lint job (clang-format) в CI
+- [x] `docs/hardware-validation.md`
+- [ ] Заполненный hardware checklist на реальном устройстве
+
 ## Цель
 
 Обеспечить возможность безопасно развивать компонент без повторения ситуации, когда обновление ESPHome ломает десятки мест одновременно и это обнаруживается только на этапе ручной проверки на реальной люстре.

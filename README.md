@@ -1,28 +1,43 @@
 # BLE ADV ESPHome Components
 
-Custom components for ESPHome using BLE Advertising
+Актуальный внешний компонент ESPHome для управления BLE-люстрами и вентиляторами через advertising packets.
 
-## Fans / Lamps controlled by BLE Advertising
+Поддерживаются семейства приложений и пультов:
 
-Use this for various Chinese lamps that are controlled via BLE advertising packets.
-Supported apps:
+- FanLamp Pro / ApplianceSmart;
+- LampSmart Pro / Vmax Smart;
+- Zhi Jia;
+- известные remote-варианты;
+- legacy-варианты `other`.
 
-* LampSmart Pro 
-* Lamp Smart Pro - Soft Lighting / Smart Lighting
-* FanLamp Pro
-* ApplianceSmart
-* Vmax smart
-* Zhi Jia
-* Other (Legacy), removed app from play store: 'FanLamp', 'ControlSwitch'
+Компонент разделён на независимое протокольное ядро, BLE scheduler и нативные ESPHome-платформы. Целевая версия: ESPHome 2026.5.2+.
 
-Details can be found [here](components/ble_adv_controller/README.md).
+Документация:
+
+- [Quick Start](components/ble_adv_controller/README.md)
+- [Глубокий аудит](docs/audit.md)
+- [Архитектура](docs/architecture.md)
+- [Матрица протоколов](docs/protocol-matrix.md)
+- [Vendor matrix](docs/vendor-matrix.md)
+- [Compatibility matrix](docs/compatibility-matrix.md)
+- [Pairing Guide](docs/pairing-guide.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Supported Devices](docs/supported-devices.md)
+- [Hardware Validation](docs/hardware-validation.md)
+- [Официальные ESPHome-референсы](docs/esphome-development-reference.md)
+- [Roadmap](docs/roadmap/)
+- [Техническое описание протоколов](components/ble_adv_controller/CUSTOM.md)
+
+## Проверка
+
+```bash
+sh tests/run_protocol_tests.sh
+sh tests/run_runtime_tests.sh
+esphome config tests/yaml/minimal-idf.yaml
+esphome config tests/yaml/full-arduino.yaml
+esphome config tests/yaml/ha-api-smoke.yaml
+```
 
 ## Credits
-Based on the initial work from:
-* @MasterDevX, [lampify](https://github.com/MasterDevX/lampify)
-* @flicker581, [lampsmart_pro_light](https://github.com/flicker581/esphome-lampsmart)
-* @aronsky, [ble_adv_light](https://github.com/aronsky/esphome-components)
-* @14roiron, [zhijia encoders](https://github.com/aronsky/esphome-components/issues/11), [investigations](https://github.com/aronsky/esphome-components/issues/18)
-* All testers and bug reporters from the initial threads:
-  * https://community.home-assistant.io/t/controlling-ble-ceiling-light-with-ha/520612/199
-  * https://github.com/aronsky/esphome-components/pull/17
+
+Основано на reverse engineering и исходных работах MasterDevX, flicker581, aronsky, 14roiron, NicoIIT и участников сообщества Home Assistant.

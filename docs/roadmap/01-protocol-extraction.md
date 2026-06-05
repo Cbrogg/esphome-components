@@ -1,5 +1,19 @@
 # Этап 1. Экстракция протокола BLE-люстр из legacy-компонента
 
+## Статус
+
+**Реализовано.**
+
+Протокольный слой вынесен в `protocol*.h/.cpp`, не зависит от ESPHome и содержит registry для всех 15 исторических variants.
+
+### Критерии готовности
+
+- [x] Per-variant command tests (encode всех supports()-команд + roundtrip)
+- [x] forced_id/index mapping tests
+- [x] tx_count increment test; rollover в `controller_logic.h` + runtime tests
+- [x] Golden corpus в `tests/samples/` для top-3 encodings
+- [x] `docs/protocol-matrix.md`
+
 ## Цель
 
 Выделить из текущего `ble_adv_controller` чистое протокольное ядро для управления BLE-люстрами через advertising packets. Новый протокольный слой не должен зависеть от ESPHome entity/codegen API, Home Assistant сущностей, динамических `select/number`, `api::CustomAPIDevice` и устаревших внутренних методов ESPHome.

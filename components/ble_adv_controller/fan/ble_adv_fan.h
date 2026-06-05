@@ -3,8 +3,7 @@
 #include "esphome/components/fan/fan.h"
 #include "../ble_adv_controller.h"
 
-namespace esphome {
-namespace bleadvcontroller {
+namespace esphome::ble_adv_controller {
 
 class BleAdvFan : public fan::Fan, public BleAdvEntity
 {
@@ -24,5 +23,4 @@ protected:
   bool forced_refresh_on_start_{true};
 };
 
-} //namespace bleadvcontroller
-} //namespace esphome
+}  // namespace esphome::ble_adv_controller

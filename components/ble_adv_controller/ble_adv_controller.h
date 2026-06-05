@@ -1,140 +1,115 @@
 #pragma once
 
-#include "esphome/core/component.h"
-#include "esphome/core/entity_base.h"
-#include "esphome/core/helpers.h"
-#include "esphome/core/preferences.h"
-#ifdef USE_API
-#include "esphome/components/api/custom_api_device.h"
-#endif
-#include "esphome/components/select/select.h"
-#include "esphome/components/number/number.h"
 #include "ble_adv_handler.h"
-#include <vector>
+#include "esphome/core/automation.h"
+#include "esphome/core/component.h"
+#include "esphome/core/helpers.h"
+
+#include <algorithm>
+#include <array>
+#include <cstdint>
 #include <list>
+#include <string>
+#include <utility>
+#include <vector>
 
-namespace esphome {
-namespace bleadvcontroller {
+namespace esphome::ble_adv_controller {
 
-// Base class to define a dynamic Configuration
-template < class BaseEntity >
-class BleAdvDynConfig: public BaseEntity
-{
-public:
-  void init(const char * name, const StringRef & parent_name) {
-    this->ref_name_ = std::string(parent_name.c_str()) + " - " + std::string(name);
-    this->sub_init();
-  }
+using protocol::Command;
+using protocol::CommandType;
 
-  // register to App and restore from config / saved data
-  virtual void sub_init() = 0;
-
-protected:
-  std::string ref_name_;
-  ESPPreferenceObject rtc_{nullptr};
-};
-
-/**
-  BleAdvSelect: basic implementation of 'Select'
- */
-class BleAdvSelect: public BleAdvDynConfig < select::Select > {
-public:
-  void control(const std::string &value) override;
-  void sub_init() override;
-};
-
-/**
-  BleAdvNumber: basic implementation of 'Number'
- */
-class BleAdvNumber: public BleAdvDynConfig < number::Number > {
-public:
-  void control(float value) override;
-  void sub_init() override;
-};
-
-/**
-  BleAdvController
- */
-class BleAdvController : public Component, public EntityBase
-#ifdef USE_API
-  , public api::CustomAPIDevice
-#endif
-{
-public:
-  void setup() override;
+class BleAdvController : public Component {
+ public:
   void loop() override;
   void dump_config() override;
-  
-  void set_min_tx_duration(int tx_duration, int min, int max, int step);
-  uint32_t get_min_tx_duration() { return (uint32_t)this->number_duration_.state; }
-  void set_max_tx_duration(uint32_t tx_duration) { this->max_tx_duration_ = tx_duration; }
-  void set_seq_duration(uint32_t seq_duration) { this->seq_duration_ = seq_duration; }
-  void set_forced_id(uint32_t forced_id) { this->params_.id_ = forced_id; }
-  void set_forced_id(const std::string & str_id) { this->params_.id_ = fnv1_hash(str_id); }
-  void set_index(uint8_t index) { this->params_.index_ = index; }
-  void set_encoding_and_variant(const std::string & encoding, const std::string & variant);
+
+  void set_handler(BleAdvHandler *handler) { this->handler_ = handler; }
+  void set_encoding(const std::string &encoding) { this->encoding_ = encoding; }
+  void set_variant(const std::string &variant) { this->variant_ = variant; }
+  void set_min_duration(uint32_t duration) { this->min_duration_ = duration; }
+  void set_max_duration(uint32_t duration) { this->max_duration_ = duration; }
+  void set_sequence_duration(uint32_t duration) { this->sequence_duration_ = duration; }
+  void set_forced_id(uint32_t forced_id) { this->params_.id = forced_id; }
+  void set_forced_id(const std::string &id) { this->params_.id = fnv1_hash(id); }
+  void set_index(uint8_t index) { this->params_.index = index; }
   void set_reversed(bool reversed) { this->reversed_ = reversed; }
+
   bool is_reversed() const { return this->reversed_; }
-  bool is_supported(const Command &cmd) { return this->cur_encoder_ != nullptr && this->cur_encoder_->is_supported(cmd); }
-  void set_show_config(bool show_config) { this->show_config_ = show_config; }
-  bool is_show_config() { return this->show_config_; }
+  const std::string &get_encoding() const { return this->encoding_; }
+  const std::string &get_variant() const { return this->variant_; }
+  uint32_t get_forced_id() const { return this->params_.id; }
+  uint8_t get_index() const { return this->params_.index; }
+  uint32_t get_min_duration() const { return this->min_duration_; }
+  uint32_t get_max_duration() const { return this->max_duration_; }
+  BleAdvHandler *get_handler() const { return this->handler_; }
+  bool supports(CommandType type) const;
+  bool enqueue(Command command);
+  bool inject_raw(const std::string &raw);
+  bool decode_raw(const std::string &raw);
+  size_t queue_size() const { return this->queue_.size() + (this->active_message_id_ != 0 ? 1 : 0); }
+  uint8_t tx_count() const { return this->params_.tx_count; }
 
-  void set_handler(BleAdvHandler * handler) { this->handler_ = handler; }
-  void refresh_encoder(std::string id, size_t index);
-
-#ifdef USE_API
-  // Services
-  void on_pair();
-  void on_unpair();
-  void on_cmd(float cmd, float arg0, float arg1, float arg2, float arg3);
-  void on_raw_inject(std::string raw);
-#endif
-
-  bool enqueue(Command &cmd);
-
-protected:
-
-  uint32_t max_tx_duration_ = 3000;
-  uint32_t seq_duration_ = 150;
-
-  ControllerParam_t params_;
-
-  bool reversed_{false};
-
-  bool show_config_{false};
-  BleAdvSelect select_encoding_;
-  BleAdvEncoder * cur_encoder_{nullptr};
-  BleAdvNumber number_duration_;
-  BleAdvHandler * handler_{nullptr};
-
+ protected:
   struct QueueItem {
-    QueueItem(CommandType cmd_type): cmd_type_(cmd_type) {}
-    CommandType cmd_type_;
-    std::vector< BleAdvParam > params_;
-    
-    QueueItem(QueueItem&&) = default;
-    QueueItem& operator=(QueueItem&&) = default;
-    QueueItem(const QueueItem&) = delete;
+    CommandType type;
+    std::vector<protocol::AdvPacket> packets;
   };
-  std::list< QueueItem > commands_;
 
-  uint32_t adv_start_time_ = 0;
-  uint16_t adv_id_ = 0;
+  BleAdvHandler *handler_{nullptr};
+  std::string encoding_;
+  std::string variant_;
+  protocol::ControllerParams params_;
+  uint32_t min_duration_{200};
+  uint32_t max_duration_{3000};
+  uint32_t sequence_duration_{100};
+  bool reversed_{false};
+  std::list<QueueItem> queue_;
+  uint16_t active_message_id_{0};
+  uint32_t active_started_at_{0};
 };
 
-/**
-  BleAdvEntity
- */
-class BleAdvEntity: public Component, public Parented < BleAdvController >
-{
-  public:
-    void dump_config() override = 0;
-
-  protected:
-    void dump_config_base(const char * tag);
-    void command(CommandType cmd, const std::vector<uint8_t> &args);
-    void command(CommandType cmd, uint8_t value1 = 0, uint8_t value2 = 0);
+class BleAdvEntity : public Component, public Parented<BleAdvController> {
+ protected:
+  bool command(CommandType type, uint8_t arg0 = 0, uint8_t arg1 = 0);
+  bool command(CommandType type, const std::vector<uint8_t> &args);
 };
 
-} //namespace bleadvcontroller
-} //namespace esphome
+template<typename... Ts> class PairAction : public Action<Ts...>, public Parented<BleAdvController> {
+ public:
+  void play(const Ts &...x) override { this->get_parent()->enqueue(Command(CommandType::PAIR)); }
+};
+
+template<typename... Ts> class UnpairAction : public Action<Ts...>, public Parented<BleAdvController> {
+ public:
+  void play(const Ts &...x) override { this->get_parent()->enqueue(Command(CommandType::UNPAIR)); }
+};
+
+template<typename... Ts> class CommandAction : public Action<Ts...>, public Parented<BleAdvController> {
+ public:
+  TEMPLATABLE_VALUE(uint8_t, command)
+  TEMPLATABLE_VALUE(uint8_t, arg0)
+  TEMPLATABLE_VALUE(uint8_t, arg1)
+  TEMPLATABLE_VALUE(uint8_t, arg2)
+  TEMPLATABLE_VALUE(uint8_t, arg3)
+
+  void play(const Ts &...x) override {
+    Command command(CommandType::CUSTOM);
+    command.raw_cmd = this->command_.value(x...);
+    command.args = {this->arg0_.value(x...), this->arg1_.value(x...), this->arg2_.value(x...), this->arg3_.value(x...)};
+    this->get_parent()->enqueue(command);
+  }
+};
+
+template<typename... Ts> class RawInjectAction : public Action<Ts...>, public Parented<BleAdvController> {
+ public:
+  TEMPLATABLE_VALUE(std::string, raw)
+  void play(const Ts &...x) override { this->get_parent()->inject_raw(this->raw_.value(x...)); }
+};
+
+template<typename... Ts> class RawDecodeAction : public Action<Ts...>, public Parented<BleAdvController> {
+ public:
+  TEMPLATABLE_VALUE(std::string, raw)
+  void play(const Ts &...x) override { this->get_parent()->decode_raw(this->raw_.value(x...)); }
+};
+
+}  // namespace esphome::ble_adv_controller

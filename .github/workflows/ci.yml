@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  protocol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Protocol tests
+        run: sh tests/run_protocol_tests.sh
+      - name: Runtime tests
+        run: sh tests/run_runtime_tests.sh
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+      - name: Check protocol formatting
+        run: |
+          clang-format --dry-run --Werror \
+            components/ble_adv_controller/protocol.cpp \
+            components/ble_adv_controller/protocol.h \
+            components/ble_adv_controller/protocol_fanlamp.cpp \
+            components/ble_adv_controller/protocol_zhijia.cpp \
+            components/ble_adv_controller/protocol_registry.cpp \
+            components/ble_adv_controller/controller_logic.h
+
+  yaml:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        esphome: ["2026.5.2", "2026.4.5", "2026.3.3"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install "esphome==${{ matrix.esphome }}"
+      - name: YAML smoke configs
+        run: |
+          for config in tests/yaml/*.yaml; do
+            echo "Validating $config"
+            esphome config "$config"
+          done
+
+  compile:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - esphome: "2026.5.2"
+            config: minimal-idf.yaml
+          - esphome: "2026.5.2"
+            config: full-arduino.yaml
+          - esphome: "2026.4.5"
+            config: minimal-idf.yaml
+          - esphome: "2026.4.5"
+            config: ha-api-smoke.yaml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install "esphome==${{ matrix.esphome }}"
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-${{ runner.os }}-${{ matrix.esphome }}-${{ matrix.config }}
+      - run: esphome compile "tests/yaml/${{ matrix.config }}"

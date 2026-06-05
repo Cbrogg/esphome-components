@@ -1,23 +1,21 @@
 #pragma once
 
-#include "esphome/components/button/button.h"
 #include "../ble_adv_controller.h"
+#include "esphome/components/button/button.h"
 
-namespace esphome {
-namespace bleadvcontroller {
+namespace esphome::ble_adv_controller {
 
-class BleAdvButton : public button::Button, public BleAdvEntity
-{
+class BleAdvButton : public button::Button, public BleAdvEntity {
  public:
   void dump_config() override;
-  void press_action() override;
-  void set_cmd(uint8_t cmd) { this->cmd_ = cmd; }
-  void set_args(const std::vector<uint8_t> &args) { this->args_ = args; }
+  void set_command(uint8_t command) { this->command_ = static_cast<CommandType>(command); }
+  void set_args(std::vector<uint8_t> args) { this->args_ = std::move(args); }
 
  protected:
-  uint8_t cmd_;
+  void press_action() override;
+
+  CommandType command_{CommandType::NOCMD};
   std::vector<uint8_t> args_;
 };
 
-} //namespace bleadvcontroller
-} //namespace esphome
+}  // namespace esphome::ble_adv_controller

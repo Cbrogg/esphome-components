@@ -1,5 +1,18 @@
 # Этап 3. Полная реализация возможностей протокола
 
+## Статус
+
+**Реализовано (CI). Аппаратная валидация — вне CI.**
+
+Runtime API полный: свет, вентилятор, pairing, raw inject/decode, decode/re-encode diagnostics.
+
+### Критерии готовности
+
+- [x] Golden corpus в `tests/samples/` для fanlamp_pro, lampsmart_pro, zhijia
+- [x] `docs/vendor-matrix.md`
+- [x] `docs/compatibility-matrix.md`
+- [ ] Аппаратная валидация — чеклист в `docs/hardware-validation.md` (заполняется вручную)
+
 ## Цель
 Покрыть все возможности поддерживаемых протоколов без привязки к Home Assistant.
 

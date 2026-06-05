@@ -1,21 +1,26 @@
 #include "ble_adv_button.h"
+
 #include "esphome/core/log.h"
-#include "esphome/components/ble_adv_controller/ble_adv_controller.h"
 
-namespace esphome {
-namespace bleadvcontroller {
+namespace esphome::ble_adv_controller {
 
-static const char *TAG = "ble_adv_button";
+static const char *const TAG = "ble_adv_controller.button";
 
-void BleAdvButton::dump_config() {
-  LOG_BUTTON("", "BleAdvButton", this);
-  BleAdvEntity::dump_config_base(TAG);
-}
+void BleAdvButton::dump_config() { LOG_BUTTON("", "BLE advertising button", this); }
 
 void BleAdvButton::press_action() {
-  ESP_LOGD(TAG, "BleAdvButton::press_action called");
-  this->command((CommandType)this->cmd_, this->args_);
+  if (this->command_ != CommandType::CUSTOM) {
+    this->command(this->command_, this->args_);
+    return;
+  }
+  if (this->args_.size() != 5) {
+    ESP_LOGE(TAG, "Custom command requires command byte and four arguments");
+    return;
+  }
+  Command command(CommandType::CUSTOM);
+  command.raw_cmd = this->args_[0];
+  std::copy(this->args_.begin() + 1, this->args_.end(), command.args.begin());
+  this->get_parent()->enqueue(command);
 }
 
-} // namespace bleadvcontroller
-} // namespace esphome
+}  // namespace esphome::ble_adv_controller

@@ -1,15 +1,12 @@
 #include "ble_adv_fan.h"
 #include "esphome/core/log.h"
-#include "esphome/components/ble_adv_controller/ble_adv_controller.h"
 
-namespace esphome {
-namespace bleadvcontroller {
+namespace esphome::ble_adv_controller {
 
-static const char *TAG = "ble_adv_fan";
+static const char *const TAG = "ble_adv_controller.fan";
 
 void BleAdvFan::dump_config() {
   LOG_FAN("", "BleAdvFan", this);
-  BleAdvEntity::dump_config_base(TAG);
 }
 
 void BleAdvFan::setup() {
@@ -42,7 +39,7 @@ void BleAdvFan::control(const fan::FanCall &call) {
     if (this->state) {
       // Switch ON, always setting with SPEED
       ESP_LOGD(TAG, "BleAdvFan::control - Setting ON with speed %d", this->speed);
-      if (this->get_parent()->is_supported(CommandType::FAN_ONOFF_SPEED)) {
+      if (this->get_parent()->supports(CommandType::FAN_ONOFF_SPEED)) {
         this->command(CommandType::FAN_ONOFF_SPEED, this->speed, this->traits_.supported_speed_count());
       } else {
         this->command(CommandType::FAN_ON);
@@ -51,7 +48,7 @@ void BleAdvFan::control(const fan::FanCall &call) {
     } else {
       // Switch OFF
       ESP_LOGD(TAG, "BleAdvFan::control - Setting OFF");
-      if (this->get_parent()->is_supported(CommandType::FAN_ONOFF_SPEED)) {
+      if (this->get_parent()->supports(CommandType::FAN_ONOFF_SPEED)) {
         this->command(CommandType::FAN_ONOFF_SPEED, 0, this->traits_.supported_speed_count());
       } else {
         this->command(CommandType::FAN_OFF);
@@ -66,9 +63,14 @@ void BleAdvFan::control(const fan::FanCall &call) {
   }
 
   if (direction_refresh && this->traits_.supports_direction()) {
-    bool isFwd = this->direction == fan::FanDirection::FORWARD;
-    ESP_LOGD(TAG, "BleAdvFan::control - Setting direction %s", (isFwd ? "fwd":"rev"));
-    this->command(CommandType::FAN_DIR, isFwd);
+    if (!this->get_parent()->supports(CommandType::FAN_DIR)) {
+      ESP_LOGW(TAG, "Direction is not supported by %s/%s", this->get_parent()->get_encoding().c_str(),
+               this->get_parent()->get_variant().c_str());
+    } else {
+      bool isFwd = this->direction == fan::FanDirection::FORWARD;
+      ESP_LOGD(TAG, "BleAdvFan::control - Setting direction %s", (isFwd ? "fwd" : "rev"));
+      this->command(CommandType::FAN_DIR, isFwd);
+    }
   }
 
   if (call.get_oscillating().has_value()) {
@@ -78,12 +80,16 @@ void BleAdvFan::control(const fan::FanCall &call) {
   }
 
   if (oscillation_refresh && this->traits_.supports_oscillation()) {
-    ESP_LOGD(TAG, "BleAdvFan::control - Setting Oscillation %s", (this->oscillating ? "ON":"OFF"));
-    this->command(CommandType::FAN_OSC, this->oscillating);
+    if (!this->get_parent()->supports(CommandType::FAN_OSC)) {
+      ESP_LOGW(TAG, "Oscillation is not supported by %s/%s", this->get_parent()->get_encoding().c_str(),
+               this->get_parent()->get_variant().c_str());
+    } else {
+      ESP_LOGD(TAG, "BleAdvFan::control - Setting Oscillation %s", (this->oscillating ? "ON" : "OFF"));
+      this->command(CommandType::FAN_OSC, this->oscillating);
+    }
   }
 
   this->publish_state();
 }
 
-} // namespace bleadvcontroller
-} // namespace esphome
+}  // namespace esphome::ble_adv_controller

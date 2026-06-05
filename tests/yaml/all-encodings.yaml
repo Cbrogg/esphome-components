@@ -1,0 +1,32 @@
+esphome:
+  name: ble-adv-all-encodings
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+    components: [ble_adv_controller]
+
+ble_adv_controller:
+  - id: fanlamp
+    encoding: fanlamp_pro
+    variant: v3
+  - id: lampsmart
+    encoding: lampsmart_pro
+    variant: v3
+  - id: zhijia
+    encoding: zhijia
+    variant: v2
+  - id: remote
+    encoding: remote
+    variant: v3
+  - id: legacy
+    encoding: other
+    variant: v1b
