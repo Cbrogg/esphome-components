@@ -14,9 +14,21 @@ from esphome.const import (
     CONF_VARIANT,
     PLATFORM_ESP32,
 )
-from esphome.core import ID, TimePeriod
+from esphome.core import CORE, ID, TimePeriod, TimePeriodMilliseconds
+from esphome.helpers import fnv1_hash
 
-from esphome.const import CONF_ENTITY_CATEGORY, CONF_NAME, ENTITY_CATEGORY_CONFIG, ENTITY_CATEGORY_DIAGNOSTIC
+DIAGNOSTIC_POLL_INTERVAL = TimePeriodMilliseconds(milliseconds=5000)
+
+from esphome.const import (
+    CONF_DISABLED_BY_DEFAULT,
+    CONF_ENTITY_CATEGORY,
+    CONF_FORCE_UPDATE,
+    CONF_MODE,
+    CONF_NAME,
+    CONF_UPDATE_INTERVAL,
+    ENTITY_CATEGORY_CONFIG,
+    ENTITY_CATEGORY_DIAGNOSTIC,
+)
 
 from .const import (
     CONF_BLE_ADV_ENCODING,
@@ -223,181 +235,169 @@ async def _get_handler(config):
     return _handler
 
 
+def _entity_config(entity_id, name, *, entity_category, **extra):
+    return {
+        CONF_ID: entity_id,
+        CONF_NAME: name,
+        CONF_ENTITY_CATEGORY: entity_category,
+        CONF_DISABLED_BY_DEFAULT: False,
+        **extra,
+    }
+
+
+async def _register_polling_text_sensor(parent, entity_id, name):
+    CORE.component_ids.add(entity_id.id)
+    entity_config = _entity_config(
+        entity_id,
+        name,
+        entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        **{CONF_UPDATE_INTERVAL: DIAGNOSTIC_POLL_INTERVAL},
+    )
+    var = await text_sensor.new_text_sensor(entity_config)
+    await cg.register_parented(var, parent)
+    await cg.register_component(var, entity_config)
+
+
+async def _register_polling_sensor(parent, entity_id, name):
+    CORE.component_ids.add(entity_id.id)
+    entity_config = _entity_config(
+        entity_id,
+        name,
+        entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        **{
+            CONF_UPDATE_INTERVAL: DIAGNOSTIC_POLL_INTERVAL,
+            CONF_FORCE_UPDATE: False,
+        },
+    )
+    var = await sensor.new_sensor(entity_config)
+    await cg.register_parented(var, parent)
+    await cg.register_component(var, entity_config)
+
+
 async def _register_diagnostic_entities(parent, config):
-    from esphome.components import sensor, text_sensor
-
     base = config[CONF_ID].id
-    update_interval = cg.update_interval("5s")
 
-    protocol = cg.new_Pvariable(
-        ID(f"{base}_protocol_text", BleAdvProtocolTextSensor), BleAdvProtocolTextSensor
+    await _register_polling_text_sensor(
+        parent,
+        ID(f"{base}_protocol_text", type=BleAdvProtocolTextSensor),
+        f"{base} Protocol",
     )
-    await cg.register_parented(protocol, parent)
-    await cg.register_component(protocol, {})
-    cg.add(protocol.set_update_interval(update_interval))
-    await text_sensor.register_text_sensor(
-        protocol,
-        {
-            CONF_NAME: f"{base} Protocol",
-            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
-        },
+    await _register_polling_text_sensor(
+        parent,
+        ID(f"{base}_last_packet", type=BleAdvLastPacketTextSensor),
+        f"{base} Last Packet",
     )
-
-    last_packet = cg.new_Pvariable(
-        ID(f"{base}_last_packet", BleAdvLastPacketTextSensor), BleAdvLastPacketTextSensor
+    await _register_polling_sensor(
+        parent,
+        ID(f"{base}_tx_count", type=BleAdvTxCountSensor),
+        f"{base} TX Counter",
     )
-    await cg.register_parented(last_packet, parent)
-    await cg.register_component(last_packet, {})
-    cg.add(last_packet.set_update_interval(update_interval))
-    await text_sensor.register_text_sensor(
-        last_packet,
-        {
-            CONF_NAME: f"{base} Last Packet",
-            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
-        },
+    await _register_polling_sensor(
+        parent,
+        ID(f"{base}_forced_id_diag", type=BleAdvForcedIdSensor),
+        f"{base} Forced ID",
+    )
+    await _register_polling_sensor(
+        parent,
+        ID(f"{base}_queue_len", type=BleAdvQueueLengthSensor),
+        f"{base} Queue Length",
     )
 
-    tx_count = cg.new_Pvariable(
-        ID(f"{base}_tx_count", BleAdvTxCountSensor), BleAdvTxCountSensor
-    )
-    await cg.register_parented(tx_count, parent)
-    await cg.register_component(tx_count, {})
-    cg.add(tx_count.set_update_interval(update_interval))
-    await sensor.register_sensor(
-        tx_count,
-        {
-            CONF_NAME: f"{base} TX Counter",
-            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
-        },
-    )
 
-    forced_id = cg.new_Pvariable(
-        ID(f"{base}_forced_id_diag", BleAdvForcedIdSensor), BleAdvForcedIdSensor
+async def _register_config_number(
+    parent, entity_id, name, *, min_value, max_value, step=1, unit=None
+):
+    entity_config = _entity_config(
+        entity_id,
+        name,
+        entity_category=ENTITY_CATEGORY_CONFIG,
+        **{CONF_MODE: number.NumberMode.NUMBER_MODE_BOX},
     )
-    await cg.register_parented(forced_id, parent)
-    await cg.register_component(forced_id, {})
-    cg.add(forced_id.set_update_interval(update_interval))
-    await sensor.register_sensor(
-        forced_id,
-        {
-            CONF_NAME: f"{base} Forced ID",
-            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
-        },
+    if unit is not None:
+        entity_config["unit_of_measurement"] = unit
+    var = cg.new_Pvariable(entity_id)
+    await cg.register_parented(var, parent)
+    await number.register_number(
+        var, entity_config, min_value=min_value, max_value=max_value, step=step
     )
+    return var
 
-    queue_len = cg.new_Pvariable(
-        ID(f"{base}_queue_len", BleAdvQueueLengthSensor), BleAdvQueueLengthSensor
+
+async def _register_config_select(parent, entity_id, name, options):
+    entity_config = _entity_config(
+        entity_id, name, entity_category=ENTITY_CATEGORY_CONFIG
     )
-    await cg.register_parented(queue_len, parent)
-    await cg.register_component(queue_len, {})
-    cg.add(queue_len.set_update_interval(update_interval))
-    await sensor.register_sensor(
-        queue_len,
-        {
-            CONF_NAME: f"{base} Queue Length",
-            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
-        },
-    )
+    var = cg.new_Pvariable(entity_id)
+    await cg.register_parented(var, parent)
+    await select.register_select(var, entity_config, options=options)
+    return var
 
 
 async def _register_config_entities(parent, config):
-    from esphome.components import number, select
-
     base = config[CONF_ID].id
     encoding = config[CONF_BLE_ADV_ENCODING]
     variants = [*ENCODINGS[encoding]["variants"], "all"]
-
-    duration = cg.new_Pvariable(
-        ID(f"{base}_duration", BleAdvDurationNumber), BleAdvDurationNumber
-    )
-    await cg.register_parented(duration, parent)
-    await cg.register_component(duration, {})
-    await number.register_number(
-        duration,
-        {
-            CONF_NAME: f"{base} Duration",
-            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_CONFIG,
-            "unit_of_measurement": "ms",
-            "mode": number.NUMBER_MODE_BOX,
-        },
-    )
-    cg.add(duration.set_internal_min(100))
-    cg.add(duration.set_internal_max(500))
-
-    max_duration = cg.new_Pvariable(
-        ID(f"{base}_max_duration", BleAdvMaxDurationNumber), BleAdvMaxDurationNumber
-    )
-    await cg.register_parented(max_duration, parent)
-    await cg.register_component(max_duration, {})
-    await number.register_number(
-        max_duration,
-        {
-            CONF_NAME: f"{base} Max Duration",
-            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_CONFIG,
-            "unit_of_measurement": "ms",
-            "mode": number.NUMBER_MODE_BOX,
-        },
-    )
-    cg.add(max_duration.set_internal_min(300))
-    cg.add(max_duration.set_internal_max(10000))
-
-    index = cg.new_Pvariable(ID(f"{base}_index", BleAdvIndexNumber), BleAdvIndexNumber)
-    await cg.register_parented(index, parent)
-    await cg.register_component(index, {})
-    await number.register_number(
-        index,
-        {
-            CONF_NAME: f"{base} Index",
-            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_CONFIG,
-            "mode": number.NUMBER_MODE_BOX,
-        },
-    )
-    cg.add(index.set_internal_min(0))
-    cg.add(index.set_internal_max(255))
-
-    forced_id = cg.new_Pvariable(
-        ID(f"{base}_forced_id_cfg", BleAdvForcedIdNumber), BleAdvForcedIdNumber
-    )
-    await cg.register_parented(forced_id, parent)
-    await cg.register_component(forced_id, {})
-    await number.register_number(
-        forced_id,
-        {
-            CONF_NAME: f"{base} Forced ID Config",
-            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_CONFIG,
-            "mode": number.NUMBER_MODE_BOX,
-        },
-    )
-    cg.add(forced_id.set_internal_min(0))
-    cg.add(forced_id.set_internal_max(0xFFFFFFFF))
-
-    encoding_select = cg.new_Pvariable(
-        ID(f"{base}_encoding", BleAdvEncodingSelect), BleAdvEncodingSelect
-    )
-    await cg.register_parented(encoding_select, parent)
-    await cg.register_component(encoding_select, {})
-    await select.register_select(
-        encoding_select,
-        {
-            CONF_NAME: f"{base} Encoding",
-            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_CONFIG,
-            "options": list(ENCODINGS.keys()),
-        },
+    forced_id_value = (
+        config[CONF_BLE_ADV_FORCED_ID]
+        if config[CONF_BLE_ADV_FORCED_ID] != 0
+        else fnv1_hash(config[CONF_ID].id)
     )
 
-    variant_select = cg.new_Pvariable(
-        ID(f"{base}_variant", BleAdvVariantSelect), BleAdvVariantSelect
+    duration = await _register_config_number(
+        parent,
+        ID(f"{base}_duration", type=BleAdvDurationNumber),
+        f"{base} Duration",
+        min_value=100,
+        max_value=500,
+        unit="ms",
     )
-    await cg.register_parented(variant_select, parent)
-    await cg.register_component(variant_select, {})
-    await select.register_select(
-        variant_select,
-        {
-            CONF_NAME: f"{base} Variant",
-            CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_CONFIG,
-            "options": variants,
-        },
+    cg.add(duration.publish_state(config[CONF_DURATION].total_milliseconds))
+
+    max_duration = await _register_config_number(
+        parent,
+        ID(f"{base}_max_duration", type=BleAdvMaxDurationNumber),
+        f"{base} Max Duration",
+        min_value=300,
+        max_value=10000,
+        unit="ms",
     )
+    cg.add(
+        max_duration.publish_state(config[CONF_BLE_ADV_MAX_DURATION].total_milliseconds)
+    )
+
+    index = await _register_config_number(
+        parent,
+        ID(f"{base}_index", type=BleAdvIndexNumber),
+        f"{base} Index",
+        min_value=0,
+        max_value=255,
+    )
+    cg.add(index.publish_state(config[CONF_INDEX]))
+
+    forced_id = await _register_config_number(
+        parent,
+        ID(f"{base}_forced_id_cfg", type=BleAdvForcedIdNumber),
+        f"{base} Forced ID Config",
+        min_value=0,
+        max_value=0xFFFFFFFF,
+    )
+    cg.add(forced_id.publish_state(forced_id_value))
+
+    encoding_select = await _register_config_select(
+        parent,
+        ID(f"{base}_encoding", type=BleAdvEncodingSelect),
+        f"{base} Encoding",
+        list(ENCODINGS.keys()),
+    )
+    cg.add(encoding_select.publish_state(encoding))
+
+    variant_select = await _register_config_select(
+        parent,
+        ID(f"{base}_variant", type=BleAdvVariantSelect),
+        f"{base} Variant",
+        variants,
+    )
+    cg.add(variant_select.publish_state(config[CONF_VARIANT]))
 
 
 async def to_code(config):
